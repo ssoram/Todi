@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    sticker_tauri_lib::run()
+    todi_lib::run()
 }
