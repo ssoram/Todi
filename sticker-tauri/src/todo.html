@@ -1,0 +1,88 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#FFF9E3}
+.strip{background:#FFD54F}
+.hdr{background:#FFE9A0}
+.hdr .tt,.hdr .cnt,.ct button{color:#6B5C00}
+.cd{background:#FFFDF2;border-color:#EEE1A0}
+.cd::before{background:#FFD54F}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt">할 일</span><span class="cnt" id="cnt"></span></div>
+ <div class="ct">
+  <button id="pinB" onclick="togglePin()"></button>
+  <button onclick="invoke('minimize_window',{label:'todo'})"><span id="_min"></span></button>
+  <button class="xb" onclick="invoke('hide_window',{label:'todo'})"><span id="_x"></span></button>
+ </div>
+</div>
+<div class="con" id="ct"></div>
+<div class="modal" id="em"><div class="mc">
+ <h3>메모 수정</h3>
+ <input type="text" id="etx" placeholder="제목">
+ <textarea id="eds" placeholder="상세 내용..."></textarea>
+ <div class="mb">
+  <button onclick="saveEdit()" style="background:#5CB85C;color:#fff">저장</button>
+  <button onclick="closeM()" style="background:#eee;color:#333">취소</button>
+ </div></div></div>
+
+<script src="common.js"></script>
+<script>
+const COL='todo',TGT='doing';
+let editIdx=null,openQA=null;
+document.getElementById('hI').innerHTML=S.todo;
+document.getElementById('pinB').innerHTML=S.unpin;
+document.getElementById('_min').innerHTML=S.min;
+document.getElementById('_x').innerHTML=S.x;
+
+async function refresh(){try{render(await invoke('get_all_data'))}catch(e){}}
+function render(D){
+  const el=document.getElementById('ct');
+  const ms=D.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.status===COL&&!m.done);
+  document.getElementById('cnt').textContent=ms.length+'개';
+  const cats=D.categories,bc={};
+  cats.forEach(c=>bc[c]=[]);
+  ms.forEach(m=>{if(!bc[m.category])bc[m.category]=[];bc[m.category].push(m)});
+  let h='',ci=0;
+  cats.forEach(c=>{
+    const it=bc[c]||[];
+    const ck=COL+':'+c,cl=D.collapsed[ck]||false,clr=CC[ci++%CC.length];
+    h+=`<div class="ch" style="background:${clr}">
+      <span class="ar" onclick="invoke('toggle_collapse',{key:'${ck}'})">${cl?'▶':'▼'}</span>
+      <span class="nm" onclick="invoke('toggle_collapse',{key:'${ck}'})">${esc(c)}<span class="n">(${it.length})</span></span>
+      <span class="ab" onclick="toggleQA('${esc(c).replace(/'/g,"\\'")}')">${S.plus}</span>
+    </div>`;
+    if(cl)return;
+    h+='<div class="grid">';
+    it.forEach(m=>{h+=card(m)});
+    h+=`<div class="qa" id="qa_${esc(c)}" style="display:none">
+      <input placeholder="메모 입력 후 Enter..." onkeydown="if(event.key==='Enter')submitQA(this,'${esc(c).replace(/'/g,"\\'")}')">
+    </div></div>`;
+  });
+  if(!h)h='<div class="empty">메모가 없습니다</div>';
+  el.innerHTML=h;
+  if(openQA){const qa=document.getElementById('qa_'+openQA);if(qa){qa.style.display='block';qa.querySelector('input').focus()}}
+}
+function card(m){
+  const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
+  return `<div class="cd"><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
+    <div class="tx">${esc(m.text)}</div>${ds}
+    <div class="btns">
+      <button class="b-done" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done}</button>
+      <button class="bm-doing" onclick="invoke('move_memo',{idx:${m._i},target:'${TGT}'})">${S.right} Doing</button>
+      <button class="b-del" onclick="delMemo(${m._i})">${S.trash}</button>
+    </div></div>`;
+}
+function toggleQA(c){openQA=c;const qa=document.getElementById('qa_'+c);if(qa){qa.style.display='block';qa.querySelector('input').focus()}}
+function submitQA(inp,c){const t=inp.value.trim();if(!t)return;invoke('add_memo',{text:t,desc:'',category:c,status:COL});inp.value='';openQA=null}
+function openEdit(idx){invoke('get_all_data').then(D=>{const m=D.memos[idx];if(!m)return;editIdx=idx;document.getElementById('etx').value=m.text;document.getElementById('eds').value=m.description||'';document.getElementById('em').classList.add('show')})}
+function saveEdit(){if(editIdx===null)return;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value});closeM()}
+function closeM(){editIdx=null;document.getElementById('em').classList.remove('show')}
+function delMemo(idx){invoke('delete_memo',{idx})}
+function togglePin(){togglePosLock()}
+
+listen('data-changed',e=>render(e.payload));
+applyFont().then(refresh);
+</script></body></html>

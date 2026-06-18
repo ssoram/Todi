@@ -1,0 +1,232 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#F5F4EE}
+.hdr{background:#E8E7E0}
+.hdr .tt{color:#333}
+.hdr .ct button{color:#555}
+.bd{padding:12px 14px;flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.bd::-webkit-scrollbar{width:5px}
+.bd::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:3px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+input[type=text],textarea{flex:1;padding:7px 12px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;outline:none;background:#fff;min-width:120px}
+textarea{min-height:36px;max-height:80px;resize:vertical}
+input:focus,textarea:focus{border-color:#5CB85C}
+select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc(var(--fs) - 1px);font-family:inherit;background:#fff;cursor:pointer;outline:none}
+.ba{padding:7px 16px;background:#5CB85C;color:#fff;border:none;border-radius:5px;font-size:var(--fs);font-family:inherit;font-weight:bold;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px}
+.ba:hover{background:#4DA84D}
+.bt{padding:5px 12px;border:1px solid #D4D3CC;border-radius:5px;background:#F0EFE8;font-size:calc(var(--fs) - 1px);font-family:inherit;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px}
+.bt:hover{background:#E4E3DC}
+.pn{display:none;background:#fff;border:1px solid #D4D3CC;border-radius:6px;padding:10px}
+.pn.show{display:block}
+.pn h3{font-size:var(--fs);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.ci{padding:5px 8px;border-radius:4px;cursor:pointer;transition:background .1s}
+.ci:hover{background:#f0f0ea}.ci.sel{background:#D6EAFF}
+.pb{display:flex;gap:4px;margin-top:8px;flex-wrap:wrap}
+.pb button{padding:4px 10px;border:none;border-radius:4px;font-size:calc(var(--fs) - 2px);font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:3px}
+.sr{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.sr label{width:100px;font-size:calc(var(--fs) - 1px);flex-shrink:0}
+.sr input{flex:1;padding:5px 8px;border:1px solid #D4D3CC;border-radius:4px;font-size:calc(var(--fs) - 1px);font-family:inherit;outline:none}
+.sr input[type=checkbox]{width:18px;height:18px;accent-color:#5CB85C;cursor:pointer;flex:none}
+.msg{padding:6px 10px;border-radius:4px;font-size:calc(var(--fs) - 1px);background:#E8F5E9;color:#2E7D32;display:none}
+.msg.show{display:block}
+</style>
+</head><body>
+<div class="hdr">
+ <span class="tt" id="pT"></span>
+ <div class="ct" style="opacity:1">
+  <button onclick="invoke('minimize_window',{label:'panel'})"><span id="iMin"></span></button>
+  <button class="xb" onclick="invoke('hide_window',{label:'panel'})"><span id="iX"></span></button>
+ </div>
+</div>
+<div class="bd">
+ <div class="row">
+  <input type="text" id="inp" placeholder="메모 제목...">
+  <select id="cat"></select>
+  <button class="ba" onclick="addM()" id="aB">추가</button>
+ </div>
+ <textarea id="dsc" placeholder="상세 내용 (선택사항)..." rows="1"></textarea>
+ <div class="row">
+  <button class="bt" onclick="tog('cp')" id="tgB">카테고리</button>
+  <button class="bt" onclick="tog('sp')" id="grB">설정</button>
+  <button class="bt" onclick="invoke('show_window',{label:'todo'})" id="toB">Todo</button>
+  <button class="bt" onclick="invoke('show_window',{label:'doing'})" id="doB">Doing</button>
+  <button class="bt" onclick="invoke('show_window',{label:'done'})" id="dnB">완료</button>
+  <button class="bt" onclick="invoke('show_window',{label:'trash'})" id="trB">휴지통</button>
+ </div>
+ <div class="pn" id="cp"><h3 id="cT"></h3><div id="cl"></div>
+  <div class="pb">
+   <button onclick="addC()" style="background:#C8E6C9;color:#2E7D32" id="acB"></button>
+   <button onclick="rnC()" style="background:#FFF9C4;color:#F57F17" id="rcB"></button>
+   <button onclick="dlC()" style="background:#FFCDD2;color:#C62828" id="dcB"></button>
+  </div>
+  <div style="font-size:calc(var(--fs) - 3px);color:#aaa;margin-top:4px">※ 드래그로 순서 변경 가능</div>
+  </div>
+ <div class="pn" id="sp"><h3 id="sT"></h3>
+  <div class="sr"><label>폰트:</label>
+   <div class="font-wrap" style="flex:1">
+    <input class="font-input" id="sF" readonly onclick="openFP()" placeholder="폰트 선택...">
+    <div class="font-drop" id="fDrop">
+     <input class="font-search" id="fSearch" placeholder="폰트 검색..." oninput="filterFonts()">
+     <div id="fRecent"></div>
+     <div id="fAll"></div>
+    </div>
+   </div>
+  </div>
+  <div class="sr"><label>글자 크기:</label><input type="number" id="sS" min="10" max="24" style="flex:1;padding:5px 8px;border:1px solid #D4D3CC;border-radius:4px;font-size:calc(var(--fs) - 1px);font-family:inherit;outline:none"></div>
+  <div class="pb"><button onclick="apS()" style="background:#C8E6C9;color:#2E7D32">적용</button></div>
+  <div class="msg" id="msg">저장 완료!</div>
+ </div>
+</div>
+
+<script src="common.js"></script>
+<script>
+let selCat=null;
+
+// 아이콘 삽입
+document.getElementById('pT').innerHTML=S.pin+' Todi';
+document.getElementById('iMin').innerHTML=S.min;
+document.getElementById('iX').innerHTML=S.x;
+document.getElementById('aB').innerHTML=S.plus+' 추가';
+document.getElementById('tgB').innerHTML=S.tag+' 카테고리';
+document.getElementById('grB').innerHTML=S.gear+' 설정';
+document.getElementById('toB').innerHTML=S.todo+' Todo';
+document.getElementById('doB').innerHTML=S.doing+' Doing';
+document.getElementById('dnB').innerHTML=S.done+' 완료';
+document.getElementById('trB').innerHTML=S.trash+' 휴지통';
+document.getElementById('cT').innerHTML=S.tag+' 카테고리 관리';
+document.getElementById('sT').innerHTML=S.gear+' 설정';
+document.getElementById('acB').innerHTML=S.plus+' 추가';
+document.getElementById('rcB').innerHTML=S.edit+' 이름변경';
+document.getElementById('dcB').innerHTML=S.trash+' 삭제';
+
+async function refresh(){
+  try{
+    const cats=await invoke('get_categories');
+    const s=await invoke('get_settings');
+    document.getElementById('sF').value=s.font_family;
+    document.getElementById('sS').value=s.font_size;
+    fSel(cats);fCl(cats);
+  }catch(e){console.error(e)}
+}
+
+function fSel(cs){const el=document.getElementById('cat'),cv=el.value;el.innerHTML='';
+  cs.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});
+  if(cs.includes(cv))el.value=cv}
+
+// ── 카테고리 드래그 정렬 ──
+let _cats=[];
+function fCl(cs){
+  _cats=cs;
+  const el=document.getElementById('cl');el.innerHTML='';selCat=null;
+  cs.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='ci';d.draggable=true;d.dataset.idx=i;
+    d.innerHTML=`<span class="dh">⠿</span> ${esc(c)}`;
+    d.onclick=()=>sI(i,c);
+    // 드래그 이벤트
+    d.ondragstart=e=>{e.dataTransfer.setData('text/plain',String(i));d.classList.add('dragging')};
+    d.ondragend=()=>d.classList.remove('dragging');
+    d.ondragover=e=>{e.preventDefault();d.classList.add('dragover')};
+    d.ondragleave=()=>d.classList.remove('dragover');
+    d.ondrop=async e=>{
+      e.preventDefault();d.classList.remove('dragover');
+      const from=parseInt(e.dataTransfer.getData('text/plain')),to=i;
+      if(from===to)return;
+      const nw=[..._cats];const[mv]=nw.splice(from,1);nw.splice(to,0,mv);
+      await invoke('reorder_categories',{categories:nw});
+    };
+    el.appendChild(d);
+  });
+}
+function sI(i,c){document.querySelectorAll('.ci').forEach((e,j)=>e.classList.toggle('sel',j===i));selCat=c}
+
+async function addM(){
+  const inp=document.getElementById('inp'),dsc=document.getElementById('dsc');
+  const t=inp.value.trim();if(!t)return;
+  await invoke('add_memo',{text:t,desc:dsc.value.trim(),category:document.getElementById('cat').value,status:'todo'});
+  inp.value='';dsc.value='';inp.focus()}
+document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter')addM()});
+
+function tog(id){['cp','sp'].forEach(x=>{if(x!==id)document.getElementById(x).classList.remove('show')});
+  document.getElementById(id).classList.toggle('show');
+  // 설정 열 때 폰트 드롭다운 닫기
+  document.getElementById('fDrop').classList.remove('show');
+}
+
+async function addC(){const n=prompt('새 카테고리:');if(n){const ok=await invoke('add_category',{name:n});if(!ok)alert('이미 있거나 빈 이름')}}
+async function dlC(){if(!selCat)return;if(await customConfirm(selCat+' 카테고리를 삭제할까요?'))await invoke('delete_category',{name:selCat})}
+async function rnC(){if(!selCat)return;const n=prompt(selCat+'의 새 이름:');if(n)await invoke('rename_category',{old:selCat,newName:n})}
+
+// ── 폰트 드롭다운 ──
+let _allFonts=[], _recentFonts=[];
+
+async function loadFonts(){
+  try{ _allFonts = await invoke('get_system_fonts'); }catch(e){ _allFonts=[]; }
+}
+
+function openFP(){
+  const drop=document.getElementById('fDrop');
+  if(drop.classList.contains('show')){drop.classList.remove('show');return}
+  drop.classList.add('show');
+  document.getElementById('fSearch').value='';
+  renderFonts('');
+  document.getElementById('fSearch').focus();
+}
+
+function renderFonts(q){
+  const cur=document.getElementById('sF').value;
+  const ql=q.toLowerCase();
+
+  // 최근 사용
+  let rh='';
+  const rf=_recentFonts.filter(f=>!q||f.toLowerCase().includes(ql));
+  if(rf.length){
+    rh='<div class="font-sec">최근 사용</div>';
+    rf.forEach(f=>{
+      rh+=`<div class="font-item${f===cur?' active':''}" style="font-family:'${f}'" onclick="pickFont('${f.replace(/'/g,"\\'")}')">${esc(f)}</div>`;
+    });
+  }
+  document.getElementById('fRecent').innerHTML=rh;
+
+  // 전체
+  let ah='<div class="font-sec">전체 폰트</div>';
+  const filtered=_allFonts.filter(f=>!q||f.toLowerCase().includes(ql));
+  filtered.slice(0,200).forEach(f=>{
+    ah+=`<div class="font-item${f===cur?' active':''}" style="font-family:'${f}'" onclick="pickFont('${f.replace(/'/g,"\\'")}')">${esc(f)}</div>`;
+  });
+  if(filtered.length>200)ah+=`<div class="font-sec">... 외 ${filtered.length-200}개</div>`;
+  document.getElementById('fAll').innerHTML=ah;
+}
+
+function filterFonts(){renderFonts(document.getElementById('fSearch').value)}
+
+function pickFont(f){
+  document.getElementById('sF').value=f;
+  document.getElementById('fDrop').classList.remove('show');
+}
+
+// 드롭다운 외부 클릭 시 닫기
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.font-wrap'))document.getElementById('fDrop').classList.remove('show');
+});
+
+async function apS(){
+  await invoke('save_user_settings',{fontFamily:document.getElementById('sF').value.trim(),fontSize:parseInt(document.getElementById('sS').value)||14});
+  const m=document.getElementById('msg');m.classList.add('show');setTimeout(()=>m.classList.remove('show'),2000);
+}
+
+// ── 이벤트 ──
+listen('data-changed',e=>{
+  fSel(e.payload.categories);fCl(e.payload.categories);
+});
+
+async function init(){
+  await applyFont();
+  await loadFonts();
+  const s=await invoke('get_settings');
+  _recentFonts=s.recent_fonts||[];
+  await refresh();
+}
+init();
+</script></body></html>

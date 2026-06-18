@@ -1,0 +1,53 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#ECFAE8}
+.strip{background:#66BB6A}
+.hdr{background:#7BC67E}
+.hdr .tt,.hdr .cnt,.ct button{color:#1B5E20}
+.cd{background:#F6FFF4;border-color:#B8E6B0}
+.cd::before{background:#66BB6A}
+.cd .tx{text-decoration:line-through;opacity:.6}
+.ts{font-size:calc(var(--fs) - 4px);color:#aaa;margin-top:3px}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt">완료 목록</span><span class="cnt" id="cnt"></span></div>
+ <div class="ct">
+  <button onclick="invoke('minimize_window',{label:'done'})"><span id="_min"></span></button>
+  <button class="xb" onclick="invoke('hide_window',{label:'done'})"><span id="_x"></span></button>
+ </div>
+</div>
+<div class="con" id="ct"></div>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('hI').innerHTML=S.done;
+document.getElementById('_min').innerHTML=S.min;
+document.getElementById('_x').innerHTML=S.x;
+
+async function refresh(){try{render(await invoke('get_all_data'))}catch(e){}}
+function render(D){
+  const el=document.getElementById('ct');
+  const ms=D.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.done);
+  document.getElementById('cnt').textContent=ms.length+'개';
+  if(!ms.length){el.innerHTML='<div class="empty">완료된 메모가 없습니다</div>';return}
+  let h='<div class="grid">';
+  ms.slice().reverse().forEach(m=>{
+    const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
+    const ts=m.done_at?`<div class="ts">완료: ${m.done_at}</div>`:'';
+    h+=`<div class="cd"><div class="tx">${esc(m.text)}</div>${ds}${ts}
+      <div class="btns">
+      <button class="b-restore" onclick="invoke('restore_memo',{idx:${m._i}})">${S.undo} 복원</button>
+      <button class="b-del" onclick="delMemo(${m._i})">${S.trash} 휴지통</button>
+      </div></div>`;
+  });
+  h+='</div>';el.innerHTML=h;
+}
+
+async function delMemo(idx){invoke('delete_memo',{idx})}
+
+listen('data-changed',e=>render(e.payload));
+applyFont().then(refresh);
+</script></body></html>
