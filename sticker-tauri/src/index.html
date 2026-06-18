@@ -114,28 +114,65 @@ function fSel(cs){const el=document.getElementById('cat'),cv=el.value;el.innerHT
   cs.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;el.appendChild(o)});
   if(cs.includes(cv))el.value=cv}
 
-// ── 카테고리 드래그 정렬 ──
+// ── 카테고리 드래그 정렬 (포인터 기반) ──
 let _cats=[];
+let _dragEl=null,_dragIdx=-1,_placeholder=null;
 function fCl(cs){
   _cats=cs;
   const el=document.getElementById('cl');el.innerHTML='';selCat=null;
   cs.forEach((c,i)=>{
     const d=document.createElement('div');
-    d.className='ci';d.draggable=true;d.dataset.idx=i;
+    d.className='ci';d.dataset.idx=i;
     d.innerHTML=`<span class="dh">⠿</span> ${esc(c)}`;
     d.onclick=()=>sI(i,c);
-    // 드래그 이벤트
-    d.ondragstart=e=>{e.dataTransfer.setData('text/plain',String(i));d.classList.add('dragging')};
-    d.ondragend=()=>d.classList.remove('dragging');
-    d.ondragover=e=>{e.preventDefault();d.classList.add('dragover')};
-    d.ondragleave=()=>d.classList.remove('dragover');
-    d.ondrop=async e=>{
-      e.preventDefault();d.classList.remove('dragover');
-      const from=parseInt(e.dataTransfer.getData('text/plain')),to=i;
-      if(from===to)return;
-      const nw=[..._cats];const[mv]=nw.splice(from,1);nw.splice(to,0,mv);
-      await invoke('reorder_categories',{categories:nw});
-    };
+    // 포인터 드래그
+    const handle=d.querySelector('.dh');
+    handle.addEventListener('pointerdown',e=>{
+      e.preventDefault();e.stopPropagation();
+      _dragIdx=i;_dragEl=d;
+      d.classList.add('dragging');
+      // 플레이스홀더
+      _placeholder=document.createElement('div');
+      _placeholder.className='ci dragover';
+      _placeholder.style.height=d.offsetHeight+'px';
+      const onMove=ev=>{
+        ev.preventDefault();
+        const items=el.querySelectorAll('.ci:not(.dragging)');
+        let target=null;
+        items.forEach(item=>{
+          const rect=item.getBoundingClientRect();
+          if(ev.clientY>rect.top&&ev.clientY<rect.bottom)target=item;
+        });
+        if(target&&target!==_placeholder){
+          const rect=target.getBoundingClientRect();
+          if(ev.clientY<rect.top+rect.height/2)el.insertBefore(_placeholder,target);
+          else el.insertBefore(_placeholder,target.nextSibling);
+        }
+      };
+      const onUp=async()=>{
+        document.removeEventListener('pointermove',onMove);
+        document.removeEventListener('pointerup',onUp);
+        d.classList.remove('dragging');
+        if(_placeholder&&_placeholder.parentNode){
+          // 새 순서 계산
+          const items=[...el.querySelectorAll('.ci:not(.dragging)')];
+          const phIdx=[...el.children].indexOf(_placeholder);
+          _placeholder.remove();
+          const nw=[..._cats];
+          const[mv]=nw.splice(_dragIdx,1);
+          // placeholder 위치에서 실제 삽입 인덱스 계산
+          let toIdx=phIdx;
+          if(_dragIdx<phIdx)toIdx--;
+          if(toIdx<0)toIdx=0;
+          if(toIdx>nw.length)toIdx=nw.length;
+          nw.splice(toIdx,0,mv);
+          if(nw.join(',')!==_cats.join(','))await invoke('reorder_categories',{categories:nw});
+        }
+        _dragEl=null;_dragIdx=-1;_placeholder=null;
+      };
+      document.addEventListener('pointermove',onMove);
+      document.addEventListener('pointerup',onUp);
+    });
     el.appendChild(d);
   });
 }

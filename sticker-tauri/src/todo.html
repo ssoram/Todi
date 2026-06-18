@@ -23,6 +23,7 @@ body{background:#FFF9E3}
  <h3>메모 수정</h3>
  <input type="text" id="etx" placeholder="제목">
  <textarea id="eds" placeholder="상세 내용..."></textarea>
+ <select id="ect" style="width:100%;padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;cursor:pointer;outline:none;margin-bottom:6px"></select>
  <div class="mb">
   <button onclick="saveEdit()" style="background:#5CB85C;color:#fff">저장</button>
   <button onclick="closeM()" style="background:#eee;color:#333">취소</button>
@@ -77,8 +78,10 @@ function card(m){
 }
 function toggleQA(c){openQA=c;const qa=document.getElementById('qa_'+c);if(qa){qa.style.display='block';qa.querySelector('input').focus()}}
 function submitQA(inp,c){const t=inp.value.trim();if(!t)return;invoke('add_memo',{text:t,desc:'',category:c,status:COL});inp.value='';openQA=null}
-function openEdit(idx){invoke('get_all_data').then(D=>{const m=D.memos[idx];if(!m)return;editIdx=idx;document.getElementById('etx').value=m.text;document.getElementById('eds').value=m.description||'';document.getElementById('em').classList.add('show')})}
-function saveEdit(){if(editIdx===null)return;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value});closeM()}
+function openEdit(idx){invoke('get_all_data').then(D=>{const m=D.memos[idx];if(!m)return;editIdx=idx;document.getElementById('etx').value=m.text;document.getElementById('eds').value=m.description||'';
+  const sel=document.getElementById('ect');sel.innerHTML='';D.categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});sel.value=m.category;
+  document.getElementById('em').classList.add('show')})}
+function saveEdit(){if(editIdx===null)return;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value,category:document.getElementById('ect').value});closeM()}
 function closeM(){editIdx=null;document.getElementById('em').classList.remove('show')}
 function delMemo(idx){invoke('delete_memo',{idx})}
 function togglePin(){togglePosLock()}
