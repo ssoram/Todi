@@ -1,0 +1,67 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#F0F0EA}
+.strip{background:#9E9E9E}
+.hdr{background:#BDBDBD}
+.hdr .tt,.hdr .cnt,.ct button{color:#424242}
+.cd{background:#FAFAFA;border-color:#E0E0E0}
+.cd::before{background:#9E9E9E}
+.cd .tx{opacity:.6}
+.ts{font-size:calc(var(--fs) - 4px);color:#aaa;margin-top:3px}
+.empty-trash-btn{margin:8px;padding:6px 12px;border-radius:5px;border:none;cursor:pointer;
+  font-size:calc(var(--fs) - 1px);font-family:inherit;background:#FFE0E0;color:#C62828;
+  display:flex;align-items:center;gap:4px;transition:filter .15s}
+.empty-trash-btn:hover{filter:brightness(.9)}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt">휴지통</span><span class="cnt" id="cnt"></span></div>
+ <div class="ct">
+  <button onclick="invoke('minimize_window',{label:'trash'})"><span id="_min"></span></button>
+  <button class="xb" onclick="invoke('hide_window',{label:'trash'})"><span id="_x"></span></button>
+ </div>
+</div>
+<div id="toolbar"></div>
+<div class="con" id="ct"></div>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('hI').innerHTML=S.trash;
+document.getElementById('_min').innerHTML=S.min;
+document.getElementById('_x').innerHTML=S.x;
+
+async function refresh(){try{render(await invoke('get_all_data'))}catch(e){}}
+function render(D){
+  const el=document.getElementById('ct');
+  const ms=D.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.status==='trash');
+  document.getElementById('cnt').textContent=ms.length+'개';
+
+  // 비우기 버튼
+  const tb=document.getElementById('toolbar');
+  if(ms.length){
+    tb.innerHTML=`<button class="empty-trash-btn" onclick="emptyTrash()">${S.trash} 휴지통 비우기</button>`;
+  } else {
+    tb.innerHTML='';
+  }
+
+  if(!ms.length){el.innerHTML='<div class="empty">휴지통이 비어있습니다</div>';return}
+  let h='<div class="grid">';
+  ms.slice().reverse().forEach(m=>{
+    const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
+    h+=`<div class="cd"><div class="tx">${esc(m.text)}</div>${ds}
+      <div class="btns">
+      <button class="b-restore" onclick="invoke('restore_memo',{idx:${m._i}})">${S.undo} 복원</button>
+      <button class="b-del" onclick="permDel(${m._i})">${S.trash} 영구삭제</button>
+      </div></div>`;
+  });
+  h+='</div>';el.innerHTML=h;
+}
+
+async function permDel(idx){if(await customConfirm('영구 삭제하면 복원할 수 없습니다.'))invoke('permanent_delete',{idx})}
+async function emptyTrash(){if(await customConfirm('휴지통의 모든 메모를 영구 삭제할까요?'))invoke('empty_trash')}
+
+listen('data-changed',e=>render(e.payload));
+applyFont().then(refresh);
+</script></body></html>
