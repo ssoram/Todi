@@ -62,6 +62,8 @@ struct Settings {
     #[serde(default)]
     autostart: bool,
     #[serde(default)]
+    close_to_tray: bool,
+    #[serde(default)]
     recent_fonts: Vec<String>,
 }
 
@@ -76,6 +78,7 @@ impl Default for Settings {
             done: WinGeo { x: 340.0, y: 200.0, w: 420.0, h: 480.0 },
             trash: WinGeo { x: 240.0, y: 150.0, w: 400.0, h: 420.0 },
             autostart: true,
+            close_to_tray: true,
             recent_fonts: vec![],
         }
     }
@@ -350,6 +353,21 @@ fn set_autostart(app: AppHandle, store: State<Store>, enabled: bool) {
 }
 
 #[tauri::command]
+fn set_close_to_tray(store: State<Store>, enabled: bool) {
+    let mut s = store.settings.lock().unwrap();
+    s.close_to_tray = enabled;
+    drop(s);
+    store.save_settings();
+}
+
+#[tauri::command]
+fn close_window(app: AppHandle, store: State<Store>, label: String) {
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.hide();
+    }
+}
+
+#[tauri::command]
 fn start_drag(window: tauri::WebviewWindow) {
     let _ = window.start_dragging();
 }
@@ -540,8 +558,8 @@ pub fn run() {
             add_memo, edit_memo, move_memo, complete_memo, restore_memo, delete_memo, permanent_delete, empty_trash,
             toggle_collapse,
             add_category, delete_category, rename_category, move_category, reorder_categories,
-            save_user_settings, get_system_fonts, set_autostart,
-            start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app,
+            save_user_settings, get_system_fonts, set_autostart, set_close_to_tray,
+            start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 오류");
