@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_updater::UpdaterExt;
 
 // ════════ 데이터 타입 ════════
@@ -74,7 +75,7 @@ impl Default for Settings {
             doing: WinGeo { x: 600.0, y: 400.0, w: 460.0, h: 540.0 },
             done: WinGeo { x: 340.0, y: 200.0, w: 420.0, h: 480.0 },
             trash: WinGeo { x: 240.0, y: 150.0, w: 400.0, h: 420.0 },
-            autostart: false,
+            autostart: true,
             recent_fonts: vec![],
         }
     }
@@ -332,6 +333,20 @@ fn get_system_fonts() -> Vec<String> {
 }
 
 #[tauri::command]
+fn set_autostart(app: AppHandle, store: State<Store>, enabled: bool) {
+    let autostart_manager = app.autolaunch();
+    if enabled {
+        let _ = autostart_manager.enable();
+    } else {
+        let _ = autostart_manager.disable();
+    }
+    let mut s = store.settings.lock().unwrap();
+    s.autostart = enabled;
+    drop(s);
+    store.save_settings();
+}
+
+#[tauri::command]
 fn start_drag(window: tauri::WebviewWindow) {
     let _ = window.start_dragging();
 }
@@ -415,6 +430,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .setup(|app| {
             // 데이터 디렉토리
             let data_dir = app.path().app_data_dir()?;
@@ -495,12 +511,20 @@ pub fn run() {
                 })
                 .build(app)?;
 
+            // 자동 시작 설정
+            let autostart_manager = app.autolaunch();
+            if settings.autostart {
+                let _ = autostart_manager.enable();
+            } else {
+                let _ = autostart_manager.disable();
+            }
+
             // 자동 업데이트 체크
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
-                if let Ok(updater) = app_handle.updater().check().await {
-                    if updater.is_update_available() {
-                        let _ = updater.download_and_install(|_, _| {}, || {}).await;
+                if let Ok(updater) = app_handle.updater() {
+                    if let Ok(Some(update)) = updater.check().await {
+                        let _ = update.download_and_install(|_, _| {}, || {}).await;
                         app_handle.restart();
                     }
                 }
@@ -513,7 +537,7 @@ pub fn run() {
             add_memo, edit_memo, move_memo, complete_memo, restore_memo, delete_memo, permanent_delete, empty_trash,
             toggle_collapse,
             add_category, delete_category, rename_category, move_category, reorder_categories,
-            save_user_settings, get_system_fonts,
+            save_user_settings, get_system_fonts, set_autostart,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app,
         ])
         .run(tauri::generate_context!())
