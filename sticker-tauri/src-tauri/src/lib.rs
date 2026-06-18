@@ -162,10 +162,13 @@ fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, cat
 }
 
 #[tauri::command]
-fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String) {
+fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String, category: Option<String>) {
     if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
         m.text = text;
         m.description = desc;
+        if let Some(cat) = category {
+            m.category = cat;
+        }
     }
     emit_refresh(&app, &store);
 }
