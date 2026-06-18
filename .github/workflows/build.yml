@@ -1,16 +1,16 @@
-name: Build
+name: Release
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
+  release:
     strategy:
       matrix:
         include:
@@ -33,16 +33,17 @@ jobs:
         with:
           workspaces: sticker-tauri/src-tauri
 
-      - name: Build Tauri app
+      - name: Build & Release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: sticker-tauri
-          tagName: build-${{ github.run_number }}
-          releaseName: '스티커메모 #${{ github.run_number }}'
-          releaseBody: '다운로드 후 실행하세요.'
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Todi ${{ github.ref_name }}'
+          releaseBody: '## 다운로드\n\n- **Windows**: `.exe` 파일 다운로드 후 실행\n- **macOS**: `.dmg` 파일 다운로드 후 실행\n\n기존 사용자는 앱 실행 시 자동 업데이트됩니다.'
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
