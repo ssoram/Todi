@@ -46,9 +46,12 @@ jobs:
         id: notes
         shell: bash
         run: |
-          BODY=$(git log -1 --format="%b" ${{ github.ref_name }})
+          # annotated tag 메시지에서 첫 줄(제목) 제외한 본문 추출
+          TAG_MSG=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
           echo "body<<EOFNOTES" >> $GITHUB_OUTPUT
-          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "## 변경사항" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "$TAG_MSG" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "---" >> $GITHUB_OUTPUT
           echo "## 다운로드" >> $GITHUB_OUTPUT
