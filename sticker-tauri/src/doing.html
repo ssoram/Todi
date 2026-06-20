@@ -68,11 +68,11 @@ function render(D){
 }
 function card(m){
   const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
-  return `<div class="cd"><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
+  return `<div class="cd" data-idx="${m._i}"><span class="cd-dh">⠿</span><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
     <div class="tx">${esc(m.text)}</div>${ds}
     <div class="btns">
       <button class="b-done" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done}</button>
-      <button class="bm-todo" onclick="invoke('move_memo',{idx:${m._i},target:'${TGT}'})">${S.left} Todo</button>
+      <button class="bm-todo" onclick="invoke('move_memo',{idx:${m._i},target:'${TGT}'})">Todo</button>
       <button class="b-del" onclick="delMemo(${m._i})">${S.trash}</button>
     </div></div>`;
 }
@@ -83,9 +83,10 @@ function openEdit(idx){invoke('get_all_data').then(D=>{const m=D.memos[idx];if(!
   document.getElementById('em').classList.add('show')})}
 function saveEdit(){if(editIdx===null)return;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value,category:document.getElementById('ect').value});closeM()}
 function closeM(){editIdx=null;document.getElementById('em').classList.remove('show')}
-function delMemo(idx){invoke('delete_memo',{idx})}
+async function delMemo(idx){if(await customConfirm('이 메모를 삭제할까요?'))invoke('delete_memo',{idx})}
 function togglePin(){togglePosLock()}
 
 listen('data-changed',e=>render(e.payload));
 applyFont().then(refresh);
+initCardDrag(document.getElementById('ct'));
 </script></body></html>
