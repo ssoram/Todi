@@ -42,6 +42,22 @@ jobs:
         with:
           workspaces: sticker-tauri/src-tauri
 
+      - name: Get release notes
+        id: notes
+        if: matrix.os == 'ubuntu-latest' || true
+        run: |
+          BODY=$(git log -1 --format="%b" ${{ github.ref_name }})
+          echo "body<<EOFNOTES" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "---" >> $GITHUB_OUTPUT
+          echo "## 다운로드" >> $GITHUB_OUTPUT
+          echo "- **Windows**: \`.exe\` 파일 다운로드 후 실행" >> $GITHUB_OUTPUT
+          echo "- **macOS**: \`.dmg\` 파일 다운로드 후 실행" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "기존 사용자는 앱 실행 시 자동 업데이트됩니다." >> $GITHUB_OUTPUT
+          echo "EOFNOTES" >> $GITHUB_OUTPUT
+
       - name: Build & Release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -52,7 +68,7 @@ jobs:
           projectPath: sticker-tauri
           tagName: ${{ github.ref_name }}
           releaseName: 'Todi ${{ github.ref_name }}'
-          releaseBody: '## 다운로드\n\n- **Windows**: `.exe` 파일 다운로드 후 실행\n- **macOS**: `.dmg` 파일 다운로드 후 실행\n\n기존 사용자는 앱 실행 시 자동 업데이트됩니다.'
+          releaseBody: ${{ steps.notes.outputs.body }}
           releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
