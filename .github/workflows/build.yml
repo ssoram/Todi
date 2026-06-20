@@ -44,7 +44,7 @@ jobs:
 
       - name: Get release notes
         id: notes
-        if: matrix.os == 'ubuntu-latest' || true
+        shell: bash
         run: |
           BODY=$(git log -1 --format="%b" ${{ github.ref_name }})
           echo "body<<EOFNOTES" >> $GITHUB_OUTPUT
