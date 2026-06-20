@@ -21,6 +21,8 @@ struct Memo {
     #[serde(default)]
     done: bool,
     done_at: Option<String>,
+    #[serde(default)]
+    prev_status: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -164,7 +166,7 @@ fn get_settings(store: State<Store>) -> Settings {
 fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String) {
     store.data.lock().unwrap().memos.push(Memo {
         text, description: desc, category, status,
-        done: false, done_at: None,
+        done: false, done_at: None, prev_status: None,
     });
     emit_refresh(&app, &store);
 }
@@ -202,8 +204,16 @@ fn complete_memo(app: AppHandle, store: State<Store>, idx: usize) {
 #[tauri::command]
 fn restore_memo(app: AppHandle, store: State<Store>, idx: usize) {
     if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
+        m.status = m.prev_status.take().unwrap_or_else(|| "todo".into());
+    }
+    emit_refresh(&app, &store);
+}
+
+#[tauri::command]
+fn uncomplete_memo(app: AppHandle, store: State<Store>, idx: usize, target: String) {
+    if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
         m.done = false;
-        m.status = "todo".into();
+        m.status = target;
         m.done_at = None;
     }
     emit_refresh(&app, &store);
@@ -213,6 +223,7 @@ fn restore_memo(app: AppHandle, store: State<Store>, idx: usize) {
 fn delete_memo(app: AppHandle, store: State<Store>, idx: usize) {
     // 휴지통으로 이동 (소프트 삭제)
     if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
+        m.prev_status = Some(m.status.clone());
         m.status = "trash".into();
     }
     emit_refresh(&app, &store);
@@ -628,7 +639,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             get_all_data, get_categories, get_settings,
-            add_memo, edit_memo, move_memo, complete_memo, restore_memo, delete_memo, permanent_delete, empty_trash,
+            add_memo, edit_memo, move_memo, complete_memo, restore_memo, uncomplete_memo, delete_memo, permanent_delete, empty_trash,
             toggle_collapse, move_memo_position,
             add_category, delete_category, rename_category, move_category, reorder_categories,
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity,

@@ -30,7 +30,7 @@ document.getElementById('_x').innerHTML=S.x;
 async function refresh(){try{render(await invoke('get_all_data'))}catch(e){}}
 function render(D){
   const el=document.getElementById('ct');
-  const ms=D.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.done);
+  const ms=D.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.done&&m.status==='done');
   document.getElementById('cnt').textContent=ms.length+'개';
   if(!ms.length){el.innerHTML='<div class="empty">완료된 메모가 없습니다</div>';return}
   let h='<div class="grid">';
@@ -39,13 +39,15 @@ function render(D){
     const ts=m.done_at?`<div class="ts">완료: ${m.done_at}</div>`:'';
     h+=`<div class="cd"><div class="tx">${esc(m.text)}</div>${ds}${ts}
       <div class="btns">
-      <button class="b-restore" onclick="invoke('restore_memo',{idx:${m._i}})">${S.undo} 복원</button>
+      <button class="bm-todo" onclick="moveTo(${m._i},'todo')">Todo</button>
+      <button class="bm-doing" onclick="moveTo(${m._i},'doing')">Doing</button>
       <button class="b-del" onclick="delMemo(${m._i})">${S.trash} 휴지통</button>
       </div></div>`;
   });
   h+='</div>';el.innerHTML=h;
 }
 
+function moveTo(idx,target){invoke('uncomplete_memo',{idx,target})}
 async function delMemo(idx){if(await customConfirm('이 메모를 삭제할까요?'))invoke('delete_memo',{idx})}
 
 listen('data-changed',e=>render(e.payload));
