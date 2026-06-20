@@ -90,3 +90,38 @@ function customConfirm(msg){
     ov.onclick=e=>{if(e.target===ov){ov.remove();resolve(false)}};
   });
 }
+
+// ═══ 카드 드래그 정렬 ═══
+function initCardDrag(container){
+  container.addEventListener('pointerdown',e=>{
+    const handle=e.target.closest('.cd-dh');
+    if(!handle)return;
+    const cd=handle.closest('.cd');
+    if(!cd||!cd.dataset.idx)return;
+    e.preventDefault();e.stopPropagation();
+    const fromIdx=parseInt(cd.dataset.idx);
+    cd.classList.add('dragging');
+    const onMove=ev=>{
+      ev.preventDefault();
+      // 모든 grid 내 카드에서 hover 대상 찾기
+      document.querySelectorAll('.cd.dragover').forEach(c=>c.classList.remove('dragover'));
+      const target=document.elementFromPoint(ev.clientX,ev.clientY);
+      const targetCard=target?target.closest('.cd[data-idx]:not(.dragging)'):null;
+      if(targetCard)targetCard.classList.add('dragover');
+    };
+    const onUp=async ev=>{
+      document.removeEventListener('pointermove',onMove);
+      document.removeEventListener('pointerup',onUp);
+      cd.classList.remove('dragging');
+      document.querySelectorAll('.cd.dragover').forEach(c=>c.classList.remove('dragover'));
+      const target=document.elementFromPoint(ev.clientX,ev.clientY);
+      const targetCard=target?target.closest('.cd[data-idx]:not(.dragging)'):null;
+      if(targetCard){
+        const toIdx=parseInt(targetCard.dataset.idx);
+        if(fromIdx!==toIdx)await invoke('move_memo_position',{from:fromIdx,to:toIdx});
+      }
+    };
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+  });
+}

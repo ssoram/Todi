@@ -243,6 +243,17 @@ fn toggle_collapse(app: AppHandle, store: State<Store>, key: String) {
     emit_refresh(&app, &store);
 }
 
+#[tauri::command]
+fn move_memo_position(app: AppHandle, store: State<Store>, from: usize, to: usize) {
+    let mut d = store.data.lock().unwrap();
+    if from < d.memos.len() && to < d.memos.len() && from != to {
+        let memo = d.memos.remove(from);
+        d.memos.insert(to, memo);
+    }
+    drop(d);
+    emit_refresh(&app, &store);
+}
+
 // ════════ 카테고리 명령 ════════
 
 #[tauri::command]
@@ -395,8 +406,29 @@ fn set_close_to_tray(store: State<Store>, enabled: bool) {
 }
 
 #[tauri::command]
-fn close_window(app: AppHandle, label: String) {
+fn close_window(app: AppHandle, store: State<Store>, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
+        // 숨기기 전에 위치/크기 저장
+        let sf = w.scale_factor().unwrap_or(1.0);
+        if let (Ok(pos), Ok(size)) = (w.outer_position(), w.inner_size()) {
+            let geo = WinGeo {
+                x: pos.x as f64 / sf,
+                y: pos.y as f64 / sf,
+                w: size.width as f64 / sf,
+                h: size.height as f64 / sf,
+            };
+            let mut s = store.settings.lock().unwrap();
+            match label.as_str() {
+                "panel" => s.panel = geo,
+                "todo"  => s.todo = geo,
+                "doing" => s.doing = geo,
+                "done"  => s.done = geo,
+                "trash" => s.trash = geo,
+                _ => {}
+            }
+            drop(s);
+            store.save_settings();
+        }
         let _ = w.hide();
     }
 }
@@ -447,6 +479,8 @@ fn save_and_exit(app: &AppHandle) {
     let mut s = store.settings.lock().unwrap();
     for label in ["panel", "todo", "doing", "done", "trash"] {
         if let Some(w) = app.get_webview_window(label) {
+            // 숨겨진 창은 크기가 정확하지 않으므로 건너뛰기
+            if !w.is_visible().unwrap_or(false) { continue; }
             // scale_factor로 나눠서 logical 좌표로 저장
             let sf = w.scale_factor().unwrap_or(1.0);
             if let (Ok(pos), Ok(size)) = (w.outer_position(), w.inner_size()) {
@@ -595,7 +629,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_all_data, get_categories, get_settings,
             add_memo, edit_memo, move_memo, complete_memo, restore_memo, delete_memo, permanent_delete, empty_trash,
-            toggle_collapse,
+            toggle_collapse, move_memo_position,
             add_category, delete_category, rename_category, move_category, reorder_categories,
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,

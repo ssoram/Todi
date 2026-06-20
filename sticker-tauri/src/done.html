@@ -46,7 +46,7 @@ function render(D){
   h+='</div>';el.innerHTML=h;
 }
 
-async function delMemo(idx){invoke('delete_memo',{idx})}
+async function delMemo(idx){if(await customConfirm('이 메모를 삭제할까요?'))invoke('delete_memo',{idx})}
 
 listen('data-changed',e=>render(e.payload));
 applyFont().then(refresh);
