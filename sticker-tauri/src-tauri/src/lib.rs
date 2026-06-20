@@ -49,6 +49,8 @@ struct WinGeo {
     h: f64,
 }
 
+fn default_opacity() -> f64 { 1.0 }
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Settings {
     font_family: String,
@@ -63,6 +65,8 @@ struct Settings {
     autostart: bool,
     #[serde(default)]
     close_to_tray: bool,
+    #[serde(default = "default_opacity")]
+    opacity: f64,
     #[serde(default)]
     recent_fonts: Vec<String>,
 }
@@ -79,6 +83,7 @@ impl Default for Settings {
             trash: WinGeo { x: 240.0, y: 150.0, w: 400.0, h: 420.0 },
             autostart: true,
             close_to_tray: true,
+            opacity: 1.0,
             recent_fonts: vec![],
         }
     }
@@ -353,6 +358,35 @@ fn set_autostart(app: AppHandle, store: State<Store>, enabled: bool) {
 }
 
 #[tauri::command]
+fn set_opacity(app: AppHandle, store: State<Store>, value: f64) {
+    let opacity = value.clamp(0.3, 1.0);
+    apply_window_opacity(&app, opacity);
+    let mut s = store.settings.lock().unwrap();
+    s.opacity = opacity;
+    drop(s);
+    store.save_settings();
+}
+
+fn apply_window_opacity(app: &AppHandle, opacity: f64) {
+    #[cfg(target_os = "windows")]
+    {
+        use windows_sys::Win32::UI::WindowsAndMessaging::*;
+        for label in ["panel", "todo", "doing", "done", "trash"] {
+            if let Some(w) = app.get_webview_window(label) {
+                if let Ok(hwnd) = w.hwnd() {
+                    let h = hwnd.0 as *mut std::ffi::c_void;
+                    unsafe {
+                        let style = GetWindowLongW(h, GWL_EXSTYLE);
+                        SetWindowLongW(h, GWL_EXSTYLE, style | WS_EX_LAYERED as i32);
+                        SetLayeredWindowAttributes(h, 0, (opacity * 255.0) as u8, LWA_ALPHA);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[tauri::command]
 fn set_close_to_tray(store: State<Store>, enabled: bool) {
     let mut s = store.settings.lock().unwrap();
     s.close_to_tray = enabled;
@@ -361,7 +395,7 @@ fn set_close_to_tray(store: State<Store>, enabled: bool) {
 }
 
 #[tauri::command]
-fn close_window(app: AppHandle, store: State<Store>, label: String) {
+fn close_window(app: AppHandle, label: String) {
     if let Some(w) = app.get_webview_window(&label) {
         let _ = w.hide();
     }
@@ -490,6 +524,11 @@ pub fn run() {
                 .build()?;
             }
 
+            // 투명도 적용
+            if settings.opacity < 1.0 {
+                apply_window_opacity(app.handle(), settings.opacity);
+            }
+
             // 시스템 트레이
             use tauri::menu::MenuBuilder;
             use tauri::tray::TrayIconBuilder;
@@ -558,7 +597,7 @@ pub fn run() {
             add_memo, edit_memo, move_memo, complete_memo, restore_memo, delete_memo, permanent_delete, empty_trash,
             toggle_collapse,
             add_category, delete_category, rename_category, move_category, reorder_categories,
-            save_user_settings, get_system_fonts, set_autostart, set_close_to_tray,
+            save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
         ])
         .run(tauri::generate_context!())
