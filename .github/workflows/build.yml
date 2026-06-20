@@ -50,7 +50,10 @@ jobs:
         shell: bash
         run: |
           # annotated tag 메시지에서 첫 줄(제목) 제외한 본문 추출
+          git fetch --tags --force
           TAG_MSG=$(git tag -l --format='%(contents:body)' ${{ github.ref_name }})
+          # Co-Authored-By 줄 제거
+          TAG_MSG=$(echo "$TAG_MSG" | grep -v '^Co-Authored-By:')
           echo "body<<EOFNOTES" >> $GITHUB_OUTPUT
           echo "## 변경사항" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
