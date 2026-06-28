@@ -26,16 +26,31 @@ body{background:var(--cal-bg,#FFF5F0)}
 .day .di{padding:1px 3px;border-radius:2px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.04);font-weight:500}
 .day .di.done-item{text-decoration:line-through;opacity:.5}
 .day .di.sched{border-left:2px solid currentColor}
-/* 메모 추가 팝업 */
-.add-pop{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.3);z-index:100;justify-content:center;align-items:center}
-.add-pop.show{display:flex}
-.add-box{background:#fff;border-radius:8px;padding:16px;width:90%;max-width:320px;box-shadow:0 8px 30px rgba(0,0,0,.15)}
-.add-box h3{margin-bottom:10px;font-size:var(--fs)}
-.add-box input,.add-box textarea,.add-box select{width:100%;padding:7px 10px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;outline:none;margin-bottom:6px;resize:vertical}
-.add-box textarea{min-height:40px}
-.add-box input:focus,.add-box textarea:focus{border-color:var(--cal-accent,#FF8A65)}
-.add-box .ab{display:flex;gap:6px;justify-content:flex-end;margin-top:6px;align-items:center}
-.add-box .ab button{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-family:inherit}
+/* 팝업 공통 */
+.pop-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.3);z-index:100;justify-content:center;align-items:center}
+.pop-overlay.show{display:flex}
+.pop-box{background:#fff;border-radius:8px;padding:16px;width:90%;max-width:380px;box-shadow:0 8px 30px rgba(0,0,0,.15);max-height:80vh;display:flex;flex-direction:column}
+.pop-box h3{margin-bottom:10px;font-size:var(--fs);display:flex;align-items:center;gap:6px}
+.pop-box input,.pop-box textarea,.pop-box select{width:100%;padding:7px 10px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;outline:none;margin-bottom:6px;resize:vertical}
+.pop-box textarea{min-height:40px}
+.pop-box input:focus,.pop-box textarea:focus{border-color:var(--cal-accent,#FF8A65)}
+.pop-box .ab{display:flex;gap:6px;justify-content:flex-end;margin-top:6px;align-items:center}
+.pop-box .ab button{padding:5px 14px;border-radius:5px;border:none;cursor:pointer;font-family:inherit}
+/* 날짜 상세 팝업 */
+.day-list{flex:1;overflow-y:auto;margin-bottom:8px}
+.day-list::-webkit-scrollbar{width:4px}
+.day-list::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:2px}
+.dl-item{padding:8px 10px;border-radius:6px;margin-bottom:6px;border:1px solid #eee;position:relative}
+.dl-item .dl-title{font-weight:600;font-size:var(--fs);word-break:break-word}
+.dl-item .dl-desc{font-size:calc(var(--fs) - 2px);color:#777;margin-top:3px;white-space:pre-wrap;word-break:break-word}
+.dl-item .dl-cat{font-size:calc(var(--fs) - 3px);margin-top:4px;display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(0,0,0,.05)}
+.dl-item .dl-status{font-size:calc(var(--fs) - 3px);color:#999;margin-left:4px}
+.dl-item .dl-btns{display:flex;gap:4px;margin-top:6px}
+.dl-item .dl-btns button{padding:3px 8px;border-radius:4px;border:none;cursor:pointer;font-size:calc(var(--fs) - 2px);font-family:inherit;transition:filter .15s}
+.dl-item .dl-btns button:hover{filter:brightness(.9)}
+.dl-item.done-item{opacity:.6}
+.dl-item.done-item .dl-title{text-decoration:line-through}
+.dl-empty{text-align:center;color:#bbb;padding:16px}
 </style>
 </head><body>
 <div class="strip"></div>
@@ -54,22 +69,33 @@ body{background:var(--cal-bg,#FFF5F0)}
 </div>
 <div class="cal-grid" id="grid"></div>
 
-<div class="add-pop" id="addPop"><div class="add-box">
- <h3 id="addTitle">메모 추가</h3>
- <input type="text" id="aInp" placeholder="메모 제목...">
- <textarea id="aDesc" placeholder="상세 내용..."></textarea>
+<!-- 날짜 상세 팝업 -->
+<div class="pop-overlay" id="dayPop"><div class="pop-box">
+ <h3 id="dayTitle">날짜</h3>
+ <div class="day-list" id="dayList"></div>
+ <div class="ab">
+  <button id="dayAddBtn" onclick="openForm(selDate)" style="background:#5CB85C;color:#fff">+ 추가</button>
+  <button onclick="closeDayPop()" style="background:#eee;color:#333">닫기</button>
+ </div>
+</div></div>
+
+<!-- 추가/수정 폼 팝업 -->
+<div class="pop-overlay" id="formPop"><div class="pop-box">
+ <h3 id="formTitle">메모 추가</h3>
+ <input type="text" id="fInp" placeholder="메모 제목...">
+ <textarea id="fDesc" placeholder="상세 내용..."></textarea>
  <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
-  <button class="mic-btn" id="addMic" onclick="startVoice(this,document.getElementById('aInp'))"></button>
+  <button class="mic-btn" id="fMic" onclick="startVoice(this,document.getElementById('fInp'))"></button>
   <span style="font-size:calc(var(--fs) - 3px);color:#aaa">제목/상세 클릭 후 음성 입력</span>
  </div>
- <select id="aCat"></select>
+ <select id="fCat"></select>
  <label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:calc(var(--fs) - 1px);cursor:pointer;user-select:none">
-  <input type="checkbox" id="aSchedOnly" style="width:16px;height:16px;accent-color:var(--cal-accent,#FF8A65);cursor:pointer">
+  <input type="checkbox" id="fSchedOnly" style="width:16px;height:16px;accent-color:var(--cal-accent,#FF8A65);cursor:pointer">
   일정만 (Todo 리스트에 표시 안 함)
  </label>
  <div class="ab">
-  <button onclick="submitAdd()" style="background:#5CB85C;color:#fff">추가</button>
-  <button onclick="closeAdd()" style="background:#eee;color:#333">취소</button>
+  <button id="fSubmitBtn" onclick="submitForm()" style="background:#5CB85C;color:#fff">추가</button>
+  <button onclick="closeForm()" style="background:#eee;color:#333">취소</button>
  </div>
 </div></div>
 
@@ -79,7 +105,7 @@ document.getElementById('hI').innerHTML=S.cal;
 document.getElementById('pinB').innerHTML=S.unpin;
 document.getElementById('_min').innerHTML=S.min;
 document.getElementById('_x').innerHTML=S.x;
-document.getElementById('addMic').innerHTML=S.mic;
+document.getElementById('fMic').innerHTML=S.mic;
 
 const CAL_COLORS=[
   {bg:'#FFF5F0',hdr:'#FFAB91',accent:'#FF8A65',text:'#BF360C',name:'coral'},
@@ -201,35 +227,103 @@ function dayCell(d,ds,items,cls,isSun,isSat,isToday){
     ih+=`<div class="di${m.done?' done-item':''}${sc}" style="color:${clr}">${esc(m.text)}</div>`;
   });
   if(items.length>3)ih+=`<div class="di" style="color:#999">+${items.length-3}</div>`;
-  return `<div class="day ${cls}${extra}" onclick="openAdd('${ds}')" title="${ds}">
+  return `<div class="day ${cls}${extra}" onclick="openDay('${ds}')" title="${ds}">
     <div class="dn">${d}</div><div class="items">${ih}</div></div>`;
 }
 
-// 메모 추가 팝업
-function openAdd(date){
+// ── 날짜 상세 팝업 ──
+function openDay(date){
   selDate=date;
-  document.getElementById('addTitle').textContent=date+' 메모 추가';
-  document.getElementById('aInp').value='';
-  document.getElementById('aDesc').value='';
-  // 카테고리 로드
-  if(allData){
-    const sel=document.getElementById('aCat');sel.innerHTML='';
-    allData.categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
-  }
-  document.getElementById('addPop').classList.add('show');
-  document.getElementById('aInp').focus();
+  document.getElementById('dayTitle').textContent=date;
+  renderDayList(date);
+  document.getElementById('dayPop').classList.add('show');
 }
-function closeAdd(){document.getElementById('addPop').classList.remove('show');selDate=null}
-async function submitAdd(){
-  const t=document.getElementById('aInp').value.trim();
-  if(!t)return;
-  const st=document.getElementById('aSchedOnly').checked?'schedule':'todo';
-  await invoke('add_memo',{text:t,desc:document.getElementById('aDesc').value.trim(),category:document.getElementById('aCat').value,status:st,dueDate:selDate});
-  closeAdd();
-}
-document.getElementById('aInp').addEventListener('keydown',e=>{if(e.key==='Enter')submitAdd()});
+function closeDayPop(){document.getElementById('dayPop').classList.remove('show');selDate=null}
 
-function render(D){allData=D;renderCal()}
+function renderDayList(date){
+  const el=document.getElementById('dayList');
+  if(!allData){el.innerHTML='<div class="dl-empty">데이터 없음</div>';return}
+  const items=allData.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.due_date===date&&m.status!=='trash');
+  if(!items.length){el.innerHTML='<div class="dl-empty">이 날짜에 일정이 없습니다</div>';return}
+  let h='';
+  items.forEach(m=>{
+    const clr=catColor(m.category);
+    const desc=m.description?`<div class="dl-desc">${esc(m.description)}</div>`:'';
+    const stLabel=m.status==='schedule'?'일정':m.status==='done'?'완료':m.status==='doing'?'진행중':'할일';
+    h+=`<div class="dl-item${m.done?' done-item':''}" style="border-left:3px solid ${clr}">
+      <div class="dl-title">${esc(m.text)}</div>${desc}
+      <div><span class="dl-cat" style="color:${clr}">${esc(m.category)}</span><span class="dl-status">${stLabel}</span></div>
+      <div class="dl-btns">
+        <button style="background:#D6EAFF;color:#1565C0" onclick="openEdit(${m._i})">${S.edit} 수정</button>
+        ${m.done?'':`<button style="background:#E8F5E9;color:#2E7D32" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done} 완료</button>`}
+        <button style="background:#FFE0E0;color:#C62828" onclick="delItem(${m._i})">${S.trash}</button>
+      </div>
+    </div>`;
+  });
+  el.innerHTML=h;
+}
+
+async function delItem(idx){if(await customConfirm('이 메모를 삭제할까요?'))invoke('delete_memo',{idx})}
+
+// ── 추가/수정 폼 ──
+let editIdx=null;
+
+function loadCatSelect(){
+  if(!allData)return;
+  const sel=document.getElementById('fCat');sel.innerHTML='';
+  allData.categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});
+}
+
+function openForm(date){
+  editIdx=null;
+  document.getElementById('formTitle').textContent=date+' 메모 추가';
+  document.getElementById('fInp').value='';
+  document.getElementById('fDesc').value='';
+  document.getElementById('fSchedOnly').checked=false;
+  document.getElementById('fSubmitBtn').textContent='추가';
+  loadCatSelect();
+  document.getElementById('formPop').classList.add('show');
+  document.getElementById('fInp').focus();
+}
+
+function openEdit(idx){
+  const m=allData.memos[idx];if(!m)return;
+  editIdx=idx;
+  document.getElementById('formTitle').textContent='메모 수정';
+  document.getElementById('fInp').value=m.text;
+  document.getElementById('fDesc').value=m.description||'';
+  document.getElementById('fSchedOnly').checked=m.status==='schedule';
+  document.getElementById('fSubmitBtn').textContent='저장';
+  loadCatSelect();
+  document.getElementById('fCat').value=m.category;
+  document.getElementById('formPop').classList.add('show');
+  document.getElementById('fInp').focus();
+}
+
+function closeForm(){document.getElementById('formPop').classList.remove('show');editIdx=null}
+
+async function submitForm(){
+  const t=document.getElementById('fInp').value.trim();
+  if(!t)return;
+  const desc=document.getElementById('fDesc').value.trim();
+  const cat=document.getElementById('fCat').value;
+  const sched=document.getElementById('fSchedOnly').checked;
+  if(editIdx!==null){
+    // 수정
+    const st=sched?'schedule':allData.memos[editIdx].status;
+    await invoke('edit_memo',{idx:editIdx,text:t,desc,category:cat,dueDate:selDate});
+    if(sched&&allData.memos[editIdx].status!=='schedule')await invoke('move_memo',{idx:editIdx,target:'schedule'});
+    else if(!sched&&allData.memos[editIdx].status==='schedule')await invoke('move_memo',{idx:editIdx,target:'todo'});
+  } else {
+    // 추가
+    const st=sched?'schedule':'todo';
+    await invoke('add_memo',{text:t,desc,category:cat,status:st,dueDate:selDate});
+  }
+  closeForm();
+}
+document.getElementById('fInp').addEventListener('keydown',e=>{if(e.key==='Enter')submitForm()});
+
+function render(D){allData=D;renderCal();if(selDate&&document.getElementById('dayPop').classList.contains('show'))renderDayList(selDate)}
 function togglePin(){togglePosLock()}
 
 async function init(){
