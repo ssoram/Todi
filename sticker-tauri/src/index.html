@@ -30,6 +30,11 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
 .sr input[type=checkbox]{width:18px;height:18px;accent-color:#5CB85C;cursor:pointer;flex:none}
 .msg{padding:6px 10px;border-radius:4px;font-size:calc(var(--fs) - 1px);background:#E8F5E9;color:#2E7D32;display:none}
 .msg.show{display:block}
+.csw{width:20px;height:20px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:all .15s;flex-shrink:0}
+.csw:hover{transform:scale(1.15)}
+.csw.sel{border-color:#333;box-shadow:0 0 0 2px rgba(0,0,0,.15)}
+.csw-custom{width:20px;height:20px;border-radius:50%;border:1px dashed #aaa;cursor:pointer;padding:0;overflow:hidden;position:relative;flex-shrink:0}
+.csw-custom input{position:absolute;top:-4px;left:-4px;width:28px;height:28px;border:none;cursor:pointer;opacity:0}
 </style>
 </head><body>
 <div class="hdr">
@@ -43,9 +48,17 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
  <div class="row">
   <input type="text" id="inp" placeholder="메모 제목...">
   <select id="cat"></select>
+  <button class="mic-btn" id="micB" onclick="startVoice(this,document.getElementById('inp'))"></button>
   <button class="ba" onclick="addM()" id="aB">추가</button>
  </div>
  <textarea id="dsc" placeholder="상세 내용 (선택사항)..." rows="1"></textarea>
+ <div style="display:flex;align-items:center;gap:6px;margin-top:-4px;flex-wrap:wrap">
+  <span style="font-size:calc(var(--fs) - 3px);color:#aaa">* 제목/상세 클릭 후 마이크 음성 입력</span>
+  <span style="flex:1"></span>
+  <label style="display:flex;align-items:center;gap:3px;font-size:calc(var(--fs) - 2px);color:#888;cursor:pointer;user-select:none"><input type="checkbox" id="schedOnly" style="width:14px;height:14px;accent-color:#FF8A65;cursor:pointer">일정만</label>
+  <input type="date" id="dueDate" style="padding:3px 6px;border:1px solid #D4D3CC;border-radius:4px;font-size:calc(var(--fs) - 2px);font-family:inherit;outline:none;cursor:pointer">
+  <span onclick="document.getElementById('dueDate').value=''" style="cursor:pointer;color:#bbb;font-size:calc(var(--fs) - 2px)" title="날짜 지우기">&#x2715;</span>
+ </div>
  <div class="row">
   <button class="bt" onclick="tog('cp')" id="tgB">카테고리</button>
   <button class="bt" onclick="tog('sp')" id="grB">설정</button>
@@ -53,6 +66,7 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <button class="bt" onclick="invoke('show_window',{label:'doing'})" id="doB">Doing</button>
   <button class="bt" onclick="invoke('show_window',{label:'done'})" id="dnB">완료</button>
   <button class="bt" onclick="invoke('show_window',{label:'trash'})" id="trB">휴지통</button>
+  <button class="bt" onclick="invoke('show_window',{label:'calendar'})" id="calB">달력</button>
  </div>
  <div class="pn" id="cp"><h3 id="cT"></h3><div id="cl"></div>
   <div class="pb">
@@ -76,6 +90,7 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <div class="sr"><label>글자 크기:</label><input type="number" id="sS" min="10" max="24" style="flex:1;padding:5px 8px;border:1px solid #D4D3CC;border-radius:4px;font-size:calc(var(--fs) - 1px);font-family:inherit;outline:none"></div>
   <div class="sr"><label>투명도:</label><input type="range" id="sO" min="30" max="100" style="flex:1;cursor:pointer;accent-color:#5CB85C" oninput="setOpacity(this.value)"><span id="sOV" style="width:36px;text-align:right;font-size:calc(var(--fs) - 2px);color:#888"></span></div>
   <div class="sr"><label>시작 시 실행:</label><input type="checkbox" id="sA" onchange="toggleAutostart(this.checked)"></div>
+  <div class="sr"><label>달력 색상:</label><div id="calColors" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"></div></div>
   <div class="pb"><button onclick="apS()" style="background:#C8E6C9;color:#2E7D32">적용</button></div>
   <div class="msg" id="msg">저장 완료!</div>
  </div>
@@ -96,6 +111,8 @@ document.getElementById('toB').innerHTML=S.todo+' Todo';
 document.getElementById('doB').innerHTML=S.doing+' Doing';
 document.getElementById('dnB').innerHTML=S.done+' 완료';
 document.getElementById('trB').innerHTML=S.trash+' 휴지통';
+document.getElementById('calB').innerHTML=S.cal+' 달력';
+document.getElementById('micB').innerHTML=S.mic;
 document.getElementById('cT').innerHTML=S.tag+' 카테고리 관리';
 document.getElementById('sT').innerHTML=S.gear+' 설정';
 document.getElementById('acB').innerHTML=S.plus+' 추가';
@@ -184,10 +201,12 @@ function fCl(cs){
 function sI(i,c){document.querySelectorAll('.ci').forEach((e,j)=>e.classList.toggle('sel',j===i));selCat=c}
 
 async function addM(){
-  const inp=document.getElementById('inp'),dsc=document.getElementById('dsc');
+  const inp=document.getElementById('inp'),dsc=document.getElementById('dsc'),dd=document.getElementById('dueDate'),so=document.getElementById('schedOnly');
   const t=inp.value.trim();if(!t)return;
-  await invoke('add_memo',{text:t,desc:dsc.value.trim(),category:document.getElementById('cat').value,status:'todo'});
-  inp.value='';dsc.value='';inp.focus()}
+  const dueDate=dd.value||null;
+  const st=so.checked?'schedule':'todo';
+  await invoke('add_memo',{text:t,desc:dsc.value.trim(),category:document.getElementById('cat').value,status:st,dueDate});
+  inp.value='';dsc.value='';dd.value='';so.checked=false;inp.focus()}
 document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter')addM()});
 
 function tog(id){['cp','sp'].forEach(x=>{if(x!==id)document.getElementById(x).classList.remove('show')});
@@ -260,6 +279,36 @@ async function apS(){
   const m=document.getElementById('msg');m.classList.add('show');setTimeout(()=>m.classList.remove('show'),2000);
 }
 
+// ── 달력 색상 ──
+const CAL_COLORS=[
+  {accent:'#FF8A65',name:'coral'},{accent:'#FFD54F',name:'yellow'},
+  {accent:'#64B5F6',name:'blue'},{accent:'#66BB6A',name:'green'},
+  {accent:'#AB47BC',name:'purple'},{accent:'#FF9800',name:'orange'},
+  {accent:'#9E9E9E',name:'gray'},{accent:'#26C6DA',name:'cyan'},
+];
+let _calColor='';
+
+function renderCalColors(){
+  const el=document.getElementById('calColors');
+  let h='';
+  CAL_COLORS.forEach(c=>{
+    h+=`<div class="csw${_calColor===c.name?' sel':''}" style="background:${c.accent}" onclick="pickCalColor('${c.name}')" title="${c.name}"></div>`;
+  });
+  h+=`<div class="csw-custom"><input type="color" value="#FF8A65" onchange="pickCalCustom(this.value)" title="직접 선택"></div>`;
+  el.innerHTML=h;
+}
+
+function pickCalColor(name){
+  _calColor=name;
+  invoke('save_calendar_color',{color:name});
+  renderCalColors();
+}
+function pickCalCustom(hex){
+  _calColor='custom:'+hex;
+  invoke('save_calendar_color',{color:_calColor});
+  renderCalColors();
+}
+
 // ── 이벤트 ──
 listen('data-changed',e=>{
   fSel(e.payload.categories);fCl(e.payload.categories);
@@ -270,6 +319,8 @@ async function init(){
   await loadFonts();
   const s=await invoke('get_settings');
   _recentFonts=s.recent_fonts||[];
+  _calColor=s.calendar_color||'';
+  renderCalColors();
   await refresh();
 }
 init();

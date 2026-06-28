@@ -23,6 +23,8 @@ struct Memo {
     done_at: Option<String>,
     #[serde(default)]
     prev_status: Option<String>,
+    #[serde(default)]
+    due_date: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -64,6 +66,8 @@ struct Settings {
     #[serde(default)]
     trash: WinGeo,
     #[serde(default)]
+    calendar: WinGeo,
+    #[serde(default)]
     autostart: bool,
     #[serde(default)]
     close_to_tray: bool,
@@ -71,6 +75,8 @@ struct Settings {
     opacity: f64,
     #[serde(default)]
     recent_fonts: Vec<String>,
+    #[serde(default)]
+    calendar_color: String,
 }
 
 impl Default for Settings {
@@ -78,15 +84,17 @@ impl Default for Settings {
         Self {
             font_family: "맑은 고딕".into(),
             font_size: 14,
-            panel: WinGeo { x: 120.0, y: 80.0, w: 540.0, h: 280.0 },
-            todo: WinGeo { x: 120.0, y: 400.0, w: 460.0, h: 540.0 },
-            doing: WinGeo { x: 600.0, y: 400.0, w: 460.0, h: 540.0 },
-            done: WinGeo { x: 340.0, y: 200.0, w: 420.0, h: 480.0 },
-            trash: WinGeo { x: 240.0, y: 150.0, w: 400.0, h: 420.0 },
+            panel: WinGeo { x: 420.0, y: 428.0, w: 573.0, h: 379.0 },
+            todo: WinGeo { x: 420.0, y: 44.0, w: 403.0, h: 374.0 },
+            doing: WinGeo { x: 833.0, y: 44.0, w: 405.0, h: 372.0 },
+            done: WinGeo { x: 420.0, y: 486.0, w: 404.0, h: 371.0 },
+            trash: WinGeo { x: 833.0, y: 486.0, w: 404.0, h: 371.0 },
+            calendar: WinGeo { x: 2.0, y: 44.0, w: 408.0, h: 449.0 },
             autostart: true,
             close_to_tray: true,
             opacity: 1.0,
             recent_fonts: vec![],
+            calendar_color: String::new(),
         }
     }
 }
@@ -163,22 +171,23 @@ fn get_settings(store: State<Store>) -> Settings {
 }
 
 #[tauri::command]
-fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String) {
+fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String, due_date: Option<String>) {
     store.data.lock().unwrap().memos.push(Memo {
         text, description: desc, category, status,
-        done: false, done_at: None, prev_status: None,
+        done: false, done_at: None, prev_status: None, due_date,
     });
     emit_refresh(&app, &store);
 }
 
 #[tauri::command]
-fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String, category: Option<String>) {
+fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String, category: Option<String>, due_date: Option<String>) {
     if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
         m.text = text;
         m.description = desc;
         if let Some(cat) = category {
             m.category = cat;
         }
+        m.due_date = due_date;
     }
     emit_refresh(&app, &store);
 }
@@ -393,7 +402,7 @@ fn apply_window_opacity(app: &AppHandle, opacity: f64) {
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::UI::WindowsAndMessaging::*;
-        for label in ["panel", "todo", "doing", "done", "trash"] {
+        for label in ["panel", "todo", "doing", "done", "trash", "calendar"] {
             if let Some(w) = app.get_webview_window(label) {
                 if let Ok(hwnd) = w.hwnd() {
                     let h = hwnd.0 as *mut std::ffi::c_void;
@@ -406,6 +415,16 @@ fn apply_window_opacity(app: &AppHandle, opacity: f64) {
             }
         }
     }
+}
+
+#[tauri::command]
+fn save_calendar_color(app: AppHandle, store: State<Store>, color: String) {
+    let mut s = store.settings.lock().unwrap();
+    s.calendar_color = color;
+    let settings_clone = s.clone();
+    drop(s);
+    store.save_settings();
+    let _ = app.emit("settings-changed", &settings_clone);
 }
 
 #[tauri::command]
@@ -435,6 +454,7 @@ fn close_window(app: AppHandle, store: State<Store>, label: String) {
                 "doing" => s.doing = geo,
                 "done"  => s.done = geo,
                 "trash" => s.trash = geo,
+                "calendar" => s.calendar = geo,
                 _ => {}
             }
             drop(s);
@@ -488,7 +508,7 @@ fn toggle_on_top(app: AppHandle, label: String) -> bool {
 fn save_and_exit(app: &AppHandle) {
     let store = app.state::<Store>();
     let mut s = store.settings.lock().unwrap();
-    for label in ["panel", "todo", "doing", "done", "trash"] {
+    for label in ["panel", "todo", "doing", "done", "trash", "calendar"] {
         if let Some(w) = app.get_webview_window(label) {
             // 숨겨진 창은 크기가 정확하지 않으므로 건너뛰기
             if !w.is_visible().unwrap_or(false) { continue; }
@@ -507,6 +527,7 @@ fn save_and_exit(app: &AppHandle) {
                     "doing" => s.doing = geo,
                     "done"  => s.done = geo,
                     "trash" => s.trash = geo,
+                    "calendar" => s.calendar = geo,
                     _ => {}
                 }
             }
@@ -547,6 +568,7 @@ pub fn run() {
                 ("doing", "doing.html",  &settings.doing, true),
                 ("done",  "done.html",   &settings.done,  false),
                 ("trash", "trash.html",  &settings.trash,  false),
+                ("calendar", "calendar.html", &settings.calendar, true),
             ];
 
             for (label, url, geo, visible) in wins {
@@ -559,10 +581,11 @@ pub fn run() {
                     "doing" => "하고 있는 일",
                     "done"  => "완료 목록",
                     "trash" => "휴지통",
+                    "calendar" => "달력",
                     _ => "",
                 })
                 .decorations(false)
-                .inner_size(geo.w, geo.h)
+                .inner_size(if geo.w > 0.0 { geo.w } else { 408.0 }, if geo.h > 0.0 { geo.h } else { 449.0 })
                 .position(geo.x, geo.y)
                 .visible(visible)
                 .min_inner_size(260.0, 180.0)
@@ -584,6 +607,7 @@ pub fn run() {
                 .text("show_doing", "Doing 보기")
                 .text("show_done", "완료 목록")
                 .text("show_trash", "휴지통")
+                .text("show_calendar", "달력")
                 .separator()
                 .text("quit", "종료")
                 .build()?;
@@ -605,6 +629,7 @@ pub fn run() {
                                 "show_doing" => "doing",
                                 "show_done" => "done",
                         "show_trash" => "trash",
+                                "show_calendar" => "calendar",
                                 _ => return,
                             };
                             if let Some(w) = app.get_webview_window(label) {
@@ -642,7 +667,7 @@ pub fn run() {
             add_memo, edit_memo, move_memo, complete_memo, restore_memo, uncomplete_memo, delete_memo, permanent_delete, empty_trash,
             toggle_collapse, move_memo_position,
             add_category, delete_category, rename_category, move_category, reorder_categories,
-            save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity,
+            save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity, save_calendar_color,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
         ])
         .run(tauri::generate_context!())
