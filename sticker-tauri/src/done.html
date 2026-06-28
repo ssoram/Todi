@@ -37,7 +37,8 @@ function render(D){
   ms.slice().reverse().forEach(m=>{
     const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
     const ts=m.done_at?`<div class="ts">완료: ${m.done_at}</div>`:'';
-    h+=`<div class="cd"><div class="tx">${esc(m.text)}</div>${ds}${ts}
+    const dt=m.due_date?`<span class="due-tag">(${m.due_date})</span>`:'';
+    h+=`<div class="cd"><div class="tx">${esc(m.text)} ${dt}</div>${ds}${ts}
       <div class="btns">
       <button class="bm-todo" onclick="moveTo(${m._i},'todo')">Todo</button>
       <button class="bm-doing" onclick="moveTo(${m._i},'doing')">Doing</button>

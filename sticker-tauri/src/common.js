@@ -15,6 +15,9 @@ edit:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="curren
 undo:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 11l-4-4 4-4"/><path d="M3 7h12a5 5 0 010 10h-3"/></svg>',
 gear:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2" fill="currentColor"/><circle cx="16" cy="12" r="2" fill="currentColor"/><circle cx="11" cy="18" r="2" fill="currentColor"/></svg>',
 tag:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/><circle cx="7" cy="7" r="1.5" fill="currentColor"/></svg>',
+cal:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+mic:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
+micOn:'<svg viewBox="0 0 24 24" width="14" height="14" fill="red" stroke="red" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="11" rx="3"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>',
 };
 
 // ═══ Tauri API ═══
@@ -89,6 +92,30 @@ function customConfirm(msg){
     document.getElementById('_cfN').onclick=()=>{ov.remove();resolve(false)};
     ov.onclick=e=>{if(e.target===ov){ov.remove();resolve(false)}};
   });
+}
+
+// ═══ 음성 인식 ═══
+// 마지막 포커스된 input/textarea 추적
+let _lastFocused=null;
+document.addEventListener('focusin',e=>{
+  if(e.target.matches('input[type=text],textarea'))_lastFocused=e.target;
+});
+
+function startVoice(btn, fallbackInput){
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SR){alert('이 브라우저는 음성 인식을 지원하지 않습니다.');return}
+  if(btn._recog){btn._recog.stop();btn._recog=null;btn.innerHTML=S.mic;btn.classList.remove('voice-on');return}
+  const target=_lastFocused||fallbackInput;
+  const r=new SR();
+  r.lang='ko-KR';r.continuous=false;r.interimResults=false;
+  btn._recog=r;btn.innerHTML=S.micOn;btn.classList.add('voice-on');
+  r.onresult=e=>{
+    const t=e.results[0][0].transcript;
+    if(target){target.value+=t;target.focus()}
+  };
+  r.onend=()=>{btn._recog=null;btn.innerHTML=S.mic;btn.classList.remove('voice-on')};
+  r.onerror=()=>{btn._recog=null;btn.innerHTML=S.mic;btn.classList.remove('voice-on')};
+  r.start();
 }
 
 // ═══ 카드 드래그 정렬 ═══

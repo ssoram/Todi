@@ -23,7 +23,12 @@ body{background:#EAF3FC}
  <h3>메모 수정</h3>
  <input type="text" id="etx" placeholder="제목">
  <textarea id="eds" placeholder="상세 내용..."></textarea>
+ <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
+  <button class="mic-btn" id="editMic" onclick="startVoice(this,document.getElementById('etx'))"></button>
+  <span style="font-size:calc(var(--fs) - 3px);color:#aaa">제목/상세 클릭 후 음성 입력</span>
+ </div>
  <select id="ect" style="width:100%;padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;cursor:pointer;outline:none;margin-bottom:6px"></select>
+ <input type="date" id="edt" style="width:100%;padding:5px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc(var(--fs) - 1px);font-family:inherit;outline:none;margin-bottom:6px">
  <div class="mb">
   <button onclick="saveEdit()" style="background:#5CB85C;color:#fff">저장</button>
   <button onclick="closeM()" style="background:#eee;color:#333">취소</button>
@@ -37,6 +42,7 @@ document.getElementById('hI').innerHTML=S.doing;
 document.getElementById('pinB').innerHTML=S.unpin;
 document.getElementById('_min').innerHTML=S.min;
 document.getElementById('_x').innerHTML=S.x;
+document.getElementById('editMic').innerHTML=S.mic;
 
 async function refresh(){try{render(await invoke('get_all_data'))}catch(e){}}
 function render(D){
@@ -60,28 +66,31 @@ function render(D){
     it.forEach(m=>{h+=card(m)});
     h+=`<div class="qa" id="qa_${esc(c)}" style="display:none">
       <input placeholder="메모 입력 후 Enter..." onkeydown="if(event.key==='Enter')submitQA(this,'${esc(c).replace(/'/g,"\\'")}')">
+      <button class="mic-btn" onclick="startVoice(this,this.previousElementSibling)">${S.mic}</button>
     </div></div>`;
   });
   if(!h)h='<div class="empty">메모가 없습니다</div>';
   el.innerHTML=h;
-  if(openQA){const qa=document.getElementById('qa_'+openQA);if(qa){qa.style.display='block';qa.querySelector('input').focus()}}
+  if(openQA){const qa=document.getElementById('qa_'+openQA);if(qa){qa.style.display='flex';qa.querySelector('input').focus()}}
 }
 function card(m){
   const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
+  const dt=m.due_date?`<span class="due-tag">(${m.due_date})</span>`:'';
   return `<div class="cd" data-idx="${m._i}"><span class="cd-dh">⠿</span><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
-    <div class="tx">${esc(m.text)}</div>${ds}
+    <div class="tx">${esc(m.text)} ${dt}</div>${ds}
     <div class="btns">
       <button class="b-done" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done}</button>
       <button class="bm-todo" onclick="invoke('move_memo',{idx:${m._i},target:'${TGT}'})">Todo</button>
       <button class="b-del" onclick="delMemo(${m._i})">${S.trash}</button>
     </div></div>`;
 }
-function toggleQA(c){openQA=c;const qa=document.getElementById('qa_'+c);if(qa){qa.style.display='block';qa.querySelector('input').focus()}}
-function submitQA(inp,c){const t=inp.value.trim();if(!t)return;invoke('add_memo',{text:t,desc:'',category:c,status:COL});inp.value='';openQA=null}
+function toggleQA(c){openQA=c;const qa=document.getElementById('qa_'+c);if(qa){qa.style.display='flex';qa.querySelector('input').focus()}}
+function submitQA(inp,c){const t=inp.value.trim();if(!t)return;invoke('add_memo',{text:t,desc:'',category:c,status:COL,dueDate:null});inp.value='';openQA=null}
 function openEdit(idx){invoke('get_all_data').then(D=>{const m=D.memos[idx];if(!m)return;editIdx=idx;document.getElementById('etx').value=m.text;document.getElementById('eds').value=m.description||'';
+  document.getElementById('edt').value=m.due_date||'';
   const sel=document.getElementById('ect');sel.innerHTML='';D.categories.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;sel.appendChild(o)});sel.value=m.category;
   document.getElementById('em').classList.add('show')})}
-function saveEdit(){if(editIdx===null)return;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value,category:document.getElementById('ect').value});closeM()}
+function saveEdit(){if(editIdx===null)return;const dd=document.getElementById('edt').value||null;invoke('edit_memo',{idx:editIdx,text:document.getElementById('etx').value,desc:document.getElementById('eds').value,category:document.getElementById('ect').value,dueDate:dd});closeM()}
 function closeM(){editIdx=null;document.getElementById('em').classList.remove('show')}
 async function delMemo(idx){if(await customConfirm('이 메모를 삭제할까요?'))invoke('delete_memo',{idx})}
 function togglePin(){togglePosLock()}

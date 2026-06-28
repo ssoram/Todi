@@ -50,7 +50,8 @@ function render(D){
   let h='<div class="grid">';
   ms.slice().reverse().forEach(m=>{
     const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
-    h+=`<div class="cd"><div class="tx">${esc(m.text)}</div>${ds}
+    const dt=m.due_date?`<span class="due-tag">(${m.due_date})</span>`:'';
+    h+=`<div class="cd"><div class="tx">${esc(m.text)} ${dt}</div>${ds}
       <div class="btns">
       <button class="b-restore" onclick="invoke('restore_memo',{idx:${m._i}})">${S.undo} 복원</button>
       <button class="b-del" onclick="permDel(${m._i})">${S.trash} 영구삭제</button>
