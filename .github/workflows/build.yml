@@ -62,12 +62,15 @@ jobs:
           echo "---" >> $GITHUB_OUTPUT
           echo "## 다운로드" >> $GITHUB_OUTPUT
           echo "- **Windows**: \`.exe\` 파일 다운로드 후 실행" >> $GITHUB_OUTPUT
-          echo "- **macOS**: \`.dmg\` 파일 다운로드 후 실행" >> $GITHUB_OUTPUT
+          echo "- **macOS**: \`.dmg\` 또는 \`.zip\` 파일 다운로드" >> $GITHUB_OUTPUT
+          echo "  - \`.zip\` 권장: 압축 해제 → 앱 우클릭 → 열기" >> $GITHUB_OUTPUT
+          echo "  - \`.dmg\` 사용 시 \"손상된 디스크 이미지\" 오류가 나면: 터미널에서 \`xattr -cr ~/Downloads/Todi*.dmg\` 실행 후 다시 열기" >> $GITHUB_OUTPUT
           echo "" >> $GITHUB_OUTPUT
           echo "기존 사용자는 앱 실행 시 자동 업데이트됩니다." >> $GITHUB_OUTPUT
           echo "EOFNOTES" >> $GITHUB_OUTPUT
 
       - name: Build & Release
+        id: tauri
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -82,3 +85,15 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           updaterJsonKeepUniversal: true
+
+      - name: Upload macOS zip
+        if: matrix.os == 'macos-latest'
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          APP_PATH=$(find sticker-tauri/src-tauri/target -name "Todi.app" -path "*/bundle/macos/*" | head -1)
+          echo "Found app at: $APP_PATH"
+          ZIP_NAME="Todi_${{ github.ref_name }}_macos.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+          gh release upload ${{ github.ref_name }} "$ZIP_NAME" --clobber
