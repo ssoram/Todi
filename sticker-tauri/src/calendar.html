@@ -9,23 +9,31 @@ body{background:var(--cal-bg,#FFF5F0)}
 .nav button{background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:4px;font-size:calc(var(--fs) + 2px);font-family:inherit;color:var(--cal-text,#BF360C);font-weight:bold}
 .nav button:hover{background:rgba(0,0,0,.06)}
 .nav .month{font-weight:bold;font-size:calc(var(--fs) + 1px);color:var(--cal-text,#BF360C)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;padding:4px 6px;flex:1;overflow-y:auto}
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(6,minmax(84px,1fr));gap:0;padding:4px 6px;flex:1;overflow-y:auto}
 .cal-grid::-webkit-scrollbar{width:5px}
 .cal-grid::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:3px}
 .day-hdr{text-align:center;font-size:calc(var(--fs) - 2px);font-weight:bold;padding:4px;color:#888}
 .day-hdr.sun{color:#E53935}
 .day-hdr.sat{color:#1565C0}
-.day{min-height:60px;padding:3px;border-radius:4px;cursor:pointer;transition:background .15s;border:1px solid transparent;position:relative}
+.day{padding:3px;border-radius:4px;cursor:pointer;transition:background .15s;border:1px solid transparent;position:relative}
 .day:hover{background:rgba(0,0,0,.04)}
 .day.today{border-color:var(--cal-accent,#FF8A65);background:rgba(255,138,101,.08)}
-.day.other{opacity:.35}
+.day.other .dn,.day.other .items{opacity:.35}
 .day .dn{font-size:calc(var(--fs) - 2px);font-weight:bold;margin-bottom:2px;color:#555}
 .day.sun .dn{color:#E53935}
 .day.sat .dn{color:#1565C0}
-.day .items{font-size:calc(var(--fs) - 4px)}
+.day .items{font-size:var(--fs)}
 .day .di{padding:1px 3px;border-radius:2px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.04);font-weight:500}
 .day .di.done-item{text-decoration:line-through;opacity:.5}
 .day .di.sched{border-left:2px solid currentColor}
+/* 기간 일정 막대 */
+.day .bar{height:calc(var(--fs) + 5px);line-height:calc(var(--fs) + 5px);font-size:var(--fs);margin:0 -5px 2px;padding:0 2px;color:#fff;white-space:nowrap;overflow:hidden;text-align:center;font-weight:600;position:relative;z-index:1}
+.day .bar.b-start{margin-left:0;border-top-left-radius:4px;border-bottom-left-radius:4px}
+.day .bar.b-end{margin-right:0;border-top-right-radius:4px;border-bottom-right-radius:4px}
+.day .bar.b-lbl{overflow:visible;z-index:2}
+.day .bar .bl{position:absolute;left:0;top:0;height:100%;width:100%;text-align:center;white-space:nowrap;overflow:hidden}
+.day .bar.b-sp{background:transparent}
+.day .bar.bar-done{opacity:.55;text-decoration:line-through}
 /* 팝업 공통 */
 .pop-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.3);z-index:100;justify-content:center;align-items:center}
 .pop-overlay.show{display:flex}
@@ -87,6 +95,10 @@ body{background:var(--cal-bg,#FFF5F0)}
  <div style="display:flex;align-items:center;gap:4px;margin-bottom:6px">
   <button class="mic-btn" id="fMic" onclick="startVoice(this,document.getElementById('fInp'))"></button>
   <span style="font-size:calc(var(--fs) - 3px);color:#aaa">제목/상세 클릭 후 음성 입력</span>
+ </div>
+ <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+  <span style="font-size:calc(var(--fs) - 2px);color:#777;white-space:nowrap">종료일 (기간 일정)</span>
+  <input type="date" id="fEnd" style="margin-bottom:0;flex:1">
  </div>
  <select id="fCat"></select>
  <label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:calc(var(--fs) - 1px);cursor:pointer;user-select:none">
@@ -157,15 +169,62 @@ function renderCal(){
   const last=new Date(curYear,curMonth+1,0);
   const startDay=first.getDay();
   const today=new Date();
-  const tStr=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const tStr=fmtDate(today.getFullYear(),today.getMonth(),today.getDate());
 
-  // 날짜별 메모 맵
+  // 42칸 날짜 배열
+  const cells=[];
+  const prevLast=new Date(curYear,curMonth,0);
+  for(let i=startDay-1;i>=0;i--){
+    const d=prevLast.getDate()-i;
+    cells.push({d,ds:fmtDate(curYear,curMonth-1,d),cls:'other',sun:false,sat:false,today:false});
+  }
+  for(let d=1;d<=last.getDate();d++){
+    const ds=fmtDate(curYear,curMonth,d);
+    const dow=cells.length%7;
+    cells.push({d,ds,cls:'',sun:dow===0,sat:dow===6,today:ds===tStr});
+  }
+  for(let d=1;cells.length<42;d++){
+    cells.push({d,ds:fmtDate(curYear,curMonth+1,d),cls:'other',sun:false,sat:false,today:false});
+  }
+
+  // 단일 날짜 메모 / 기간 일정 분리
   const dateMap={};
+  const ranges=[];
   if(allData){
     allData.memos.forEach((m,i)=>{
-      if(m.due_date&&m.status!=='trash'){
+      if(!m.due_date||m.status==='trash')return;
+      if(m.end_date&&m.end_date>m.due_date)ranges.push({...m,_i:i});
+      else{
         if(!dateMap[m.due_date])dateMap[m.due_date]=[];
         dateMap[m.due_date].push({...m,_i:i});
+      }
+    });
+  }
+
+  // 주 단위로 기간 막대 레인 배치
+  const cellBars=Array.from({length:42},()=>[]);
+  for(let w=0;w<6;w++){
+    const wStart=cells[w*7].ds,wEnd=cells[w*7+6].ds;
+    const segs=[];
+    ranges.forEach(ev=>{
+      if(ev.end_date<wStart||ev.due_date>wEnd)return;
+      let s=0,e=6;
+      for(let i=0;i<7;i++){
+        const ds=cells[w*7+i].ds;
+        if(ds===ev.due_date)s=i;
+        if(ds===ev.end_date)e=i;
+      }
+      segs.push({ev,s,e});
+    });
+    segs.sort((a,b)=>a.s-b.s||b.e-a.e);
+    const lanes=[];
+    segs.forEach(sg=>{
+      let l=0;
+      while(lanes[l]&&lanes[l].slice(sg.s,sg.e+1).some(Boolean))l++;
+      if(!lanes[l])lanes[l]=Array(7).fill(false);
+      for(let i=sg.s;i<=sg.e;i++)lanes[l][i]=true;
+      for(let i=sg.s;i<=sg.e;i++){
+        cellBars[w*7+i][l]={ev:sg.ev,st:cells[w*7+i].ds===sg.ev.due_date,en:cells[w*7+i].ds===sg.ev.end_date,label:i===sg.s?sg.ev.text:'',span:sg.e-sg.s+1};
       }
     });
   }
@@ -173,32 +232,14 @@ function renderCal(){
   let h='';
   const days=['일','월','화','수','목','금','토'];
   days.forEach((d,i)=>h+=`<div class="day-hdr${i===0?' sun':''}${i===6?' sat':''}">${d}</div>`);
-
-  // 이전 달
-  const prevLast=new Date(curYear,curMonth,0);
-  for(let i=startDay-1;i>=0;i--){
-    const d=prevLast.getDate()-i;
-    const ds=fmtDate(curYear,curMonth-1,d);
-    h+=dayCell(d,ds,dateMap[ds]||[],'other',false,false);
-  }
-  // 이번 달
-  for(let d=1;d<=last.getDate();d++){
-    const ds=fmtDate(curYear,curMonth,d);
-    const isToday=ds===tStr;
-    const dow=new Date(curYear,curMonth,d).getDay();
-    h+=dayCell(d,ds,dateMap[ds]||[],'',dow===0,dow===6,isToday);
-  }
-  // 다음 달
-  const remaining=42-(startDay+last.getDate());
-  for(let d=1;d<=remaining;d++){
-    const ds=fmtDate(curYear,curMonth+1,d);
-    h+=dayCell(d,ds,dateMap[ds]||[],'other',false,false);
-  }
+  cells.forEach((c,i)=>h+=dayCell(c,dateMap[c.ds]||[],cellBars[i]));
   grid.innerHTML=h;
 
-  // 카운트
-  const monthMemos=Object.keys(dateMap).filter(k=>k.startsWith(`${curYear}-${String(curMonth+1).padStart(2,'0')}`));
-  let cnt=0;monthMemos.forEach(k=>cnt+=dateMap[k].length);
+  // 카운트 (해당 월에 걸친 기간 일정 포함)
+  const mPre=`${curYear}-${String(curMonth+1).padStart(2,'0')}`;
+  let cnt=0;
+  Object.keys(dateMap).forEach(k=>{if(k.startsWith(mPre))cnt+=dateMap[k].length});
+  ranges.forEach(ev=>{if(ev.due_date<=mPre+'-31'&&ev.end_date>=mPre+'-01')cnt++});
   document.getElementById('cnt').textContent=cnt?cnt+'개':'';
 }
 
@@ -217,18 +258,29 @@ function catColor(cat){
   return hues[idx%hues.length];
 }
 
-function dayCell(d,ds,items,cls,isSun,isSat,isToday){
+function dayCell(c,items,bars){
   let extra='';
-  if(isSun)extra+=' sun';if(isSat)extra+=' sat';if(isToday)extra+=' today';
+  if(c.sun)extra+=' sun';if(c.sat)extra+=' sat';if(c.today)extra+=' today';
+  // 기간 막대 (빈 레인은 투명 스페이서로 정렬 유지)
+  let bh='';
+  for(let l=0;l<bars.length;l++){
+    const b=bars[l];
+    if(!b){bh+='<div class="bar b-sp"></div>';continue}
+    const clr=catColor(b.ev.category);
+    bh+=`<div class="bar${b.st?' b-start':''}${b.en?' b-end':''}${b.label?' b-lbl':''}${b.ev.done?' bar-done':''}" style="background:${clr}">${b.label?`<span class="bl" style="width:calc(${b.span}*100%)">${esc(b.label)}</span>`:''}</div>`;
+  }
+  // 막대가 차지한 만큼 단일 메모 표시 개수 축소 (기본: 3개까지, 넘치면 +N)
+  const budget=Math.max(0,3-bars.length);
+  const showN=items.length>budget?Math.max(0,budget-1):items.length;
   let ih='';
-  items.slice(0,3).forEach(m=>{
+  items.slice(0,showN).forEach(m=>{
     const clr=catColor(m.category);
     const sc=m.status==='schedule'?' sched':'';
     ih+=`<div class="di${m.done?' done-item':''}${sc}" style="color:${clr}">${esc(m.text)}</div>`;
   });
-  if(items.length>3)ih+=`<div class="di" style="color:#999">+${items.length-3}</div>`;
-  return `<div class="day ${cls}${extra}" onclick="openDay('${ds}')" title="${ds}">
-    <div class="dn">${d}</div><div class="items">${ih}</div></div>`;
+  if(items.length>showN)ih+=`<div class="di" style="color:#999">+${items.length-showN}</div>`;
+  return `<div class="day ${c.cls}${extra}" onclick="openDay('${c.ds}')" title="${c.ds}">
+    <div class="dn">${c.d}</div>${bh}<div class="items">${ih}</div></div>`;
 }
 
 // ── 날짜 상세 팝업 ──
@@ -243,7 +295,7 @@ function closeDayPop(){document.getElementById('dayPop').classList.remove('show'
 function renderDayList(date){
   const el=document.getElementById('dayList');
   if(!allData){el.innerHTML='<div class="dl-empty">데이터 없음</div>';return}
-  const items=allData.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.due_date===date&&m.status!=='trash');
+  const items=allData.memos.map((m,i)=>({...m,_i:i})).filter(m=>m.status!=='trash'&&m.due_date&&(m.due_date===date||(m.end_date&&m.due_date<=date&&date<=m.end_date)));
   if(!items.length){el.innerHTML='<div class="dl-empty">이 날짜에 일정이 없습니다</div>';return}
   let h='';
   items.forEach(m=>{
@@ -252,7 +304,7 @@ function renderDayList(date){
     const stLabel=m.status==='schedule'?'일정':m.status==='done'?'완료':m.status==='doing'?'진행중':'할일';
     h+=`<div class="dl-item${m.done?' done-item':''}" style="border-left:3px solid ${clr}">
       <div class="dl-title">${esc(m.text)}</div>${desc}
-      <div><span class="dl-cat" style="color:${clr}">${esc(m.category)}</span><span class="dl-status">${stLabel}</span></div>
+      <div><span class="dl-cat" style="color:${clr}">${esc(m.category)}</span><span class="dl-status">${stLabel}</span>${m.end_date&&m.end_date>m.due_date?`<span class="dl-status">${m.due_date} ~ ${m.end_date}</span>`:''}</div>
       <div class="dl-btns">
         <button style="background:#D6EAFF;color:#1565C0" onclick="openEdit(${m._i})">${S.edit} 수정</button>
         ${m.done?'':`<button style="background:#E8F5E9;color:#2E7D32" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done} 완료</button>`}
@@ -279,6 +331,7 @@ function openForm(date){
   document.getElementById('formTitle').textContent=date+' 메모 추가';
   document.getElementById('fInp').value='';
   document.getElementById('fDesc').value='';
+  document.getElementById('fEnd').value='';
   document.getElementById('fSchedOnly').checked=false;
   document.getElementById('fSubmitBtn').textContent='추가';
   loadCatSelect();
@@ -292,6 +345,7 @@ function openEdit(idx){
   document.getElementById('formTitle').textContent='메모 수정';
   document.getElementById('fInp').value=m.text;
   document.getElementById('fDesc').value=m.description||'';
+  document.getElementById('fEnd').value=m.end_date||'';
   document.getElementById('fSchedOnly').checked=m.status==='schedule';
   document.getElementById('fSubmitBtn').textContent='저장';
   loadCatSelect();
@@ -309,15 +363,19 @@ async function submitForm(){
   const cat=document.getElementById('fCat').value;
   const sched=document.getElementById('fSchedOnly').checked;
   if(editIdx!==null){
-    // 수정
-    const st=sched?'schedule':allData.memos[editIdx].status;
-    await invoke('edit_memo',{idx:editIdx,text:t,desc,category:cat,dueDate:selDate});
+    // 수정: 기간 일정은 원래 시작일 유지 (중간 날짜에서 열어도 시작일이 바뀌지 않도록)
+    const due=allData.memos[editIdx].due_date||selDate;
+    const endD=document.getElementById('fEnd').value;
+    const endDate=endD&&endD>due?endD:'';
+    await invoke('edit_memo',{idx:editIdx,text:t,desc,category:cat,dueDate:due,endDate});
     if(sched&&allData.memos[editIdx].status!=='schedule')await invoke('move_memo',{idx:editIdx,target:'schedule'});
     else if(!sched&&allData.memos[editIdx].status==='schedule')await invoke('move_memo',{idx:editIdx,target:'todo'});
   } else {
     // 추가
     const st=sched?'schedule':'todo';
-    await invoke('add_memo',{text:t,desc,category:cat,status:st,dueDate:selDate});
+    const endD=document.getElementById('fEnd').value;
+    const endDate=endD&&endD>selDate?endD:'';
+    await invoke('add_memo',{text:t,desc,category:cat,status:st,dueDate:selDate,endDate});
   }
   closeForm();
 }

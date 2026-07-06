@@ -25,6 +25,8 @@ struct Memo {
     prev_status: Option<String>,
     #[serde(default)]
     due_date: Option<String>,
+    #[serde(default)]
+    end_date: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -171,16 +173,17 @@ fn get_settings(store: State<Store>) -> Settings {
 }
 
 #[tauri::command]
-fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String, due_date: Option<String>) {
+fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String, due_date: Option<String>, end_date: Option<String>) {
+    let end_date = end_date.filter(|s| !s.is_empty());
     store.data.lock().unwrap().memos.push(Memo {
         text, description: desc, category, status,
-        done: false, done_at: None, prev_status: None, due_date,
+        done: false, done_at: None, prev_status: None, due_date, end_date,
     });
     emit_refresh(&app, &store);
 }
 
 #[tauri::command]
-fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String, category: Option<String>, due_date: Option<String>) {
+fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc: String, category: Option<String>, due_date: Option<String>, end_date: Option<String>) {
     if let Some(m) = store.data.lock().unwrap().memos.get_mut(idx) {
         m.text = text;
         m.description = desc;
@@ -188,6 +191,10 @@ fn edit_memo(app: AppHandle, store: State<Store>, idx: usize, text: String, desc
             m.category = cat;
         }
         m.due_date = due_date;
+        // end_date는 인자가 전달된 경우에만 갱신 (todo/doing 창의 수정으로 기간이 지워지지 않도록)
+        if let Some(ed) = end_date {
+            m.end_date = if ed.is_empty() { None } else { Some(ed) };
+        }
     }
     emit_refresh(&app, &store);
 }
