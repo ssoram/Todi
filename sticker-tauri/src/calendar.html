@@ -9,13 +9,14 @@ body{background:var(--cal-bg,#FFF5F0)}
 .nav button{background:none;border:none;cursor:pointer;padding:4px 10px;border-radius:4px;font-size:calc(var(--fs) + 2px);font-family:inherit;color:var(--cal-text,#BF360C);font-weight:bold}
 .nav button:hover{background:rgba(0,0,0,.06)}
 .nav .month{font-weight:bold;font-size:calc(var(--fs) + 1px);color:var(--cal-text,#BF360C)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(6,minmax(84px,1fr));gap:0;padding:4px 6px;flex:1;overflow-y:auto}
+/* 행 개수(그 달의 주 수)는 renderCal에서 지정 — 내용보다 작아지지 않고 남는 공간은 채움 */
+.cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-template-rows:auto repeat(6,minmax(min-content,1fr));gap:0;padding:4px 6px;flex:1;min-height:0;overflow-y:auto}
 .cal-grid::-webkit-scrollbar{width:5px}
 .cal-grid::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:3px}
 .day-hdr{text-align:center;font-size:calc(var(--fs) - 2px);font-weight:bold;padding:4px;color:#888}
 .day-hdr.sun{color:#E53935}
 .day-hdr.sat{color:#1565C0}
-.day{padding:3px;border-radius:4px;cursor:pointer;transition:background .15s;border:1px solid transparent;position:relative}
+.day{padding:3px;border-radius:4px;cursor:pointer;transition:background .15s;border:1px solid transparent;position:relative;min-height:calc(var(--fs) + 22px)}
 .day:hover{background:rgba(0,0,0,.04)}
 .day.today{border-color:var(--cal-accent,#FF8A65);background:rgba(255,138,101,.08)}
 .day.other .dn,.day.other .items{opacity:.35}
@@ -131,6 +132,27 @@ const CAL_COLORS=[
 ];
 
 let curYear,curMonth,allData=null,selDate=null;
+let curWeeks=6,lastFitH=0;
+
+// ── 창 높이 자동 맞춤 ──
+// 현재 달의 모든 날짜가 잘리지 않고 보이는 최소 높이를 재서 창의 최소 높이로 지정한다.
+// (가로는 건드리지 않음 / 세로가 부족하면 그만큼 늘어남)
+function gridRows(w){return `auto repeat(${w},minmax(min-content,1fr))`}
+
+function fitHeight(){
+  const grid=document.getElementById('grid');
+  const last=grid.lastElementChild;
+  if(!last)return;
+  grid.scrollTop=0;
+  // 행을 내용 높이로 고정한 상태에서 재고 바로 원복
+  grid.style.gridTemplateRows=`auto repeat(${curWeeks},min-content)`;
+  const padB=parseFloat(getComputedStyle(grid).paddingBottom)||0;
+  const need=Math.ceil(last.getBoundingClientRect().bottom+padB);
+  grid.style.gridTemplateRows=gridRows(curWeeks);
+  if(!need||Math.abs(need-lastFitH)<1)return;
+  lastFitH=need;
+  invoke('fit_window_height',{label:'calendar',height:need}).catch(()=>{});
+}
 
 function applyCalColor(c){
   const r=document.documentElement;
@@ -171,7 +193,10 @@ function renderCal(){
   const today=new Date();
   const tStr=fmtDate(today.getFullYear(),today.getMonth(),today.getDate());
 
-  // 42칸 날짜 배열
+  // 이 달에 필요한 주 수만큼만 칸 생성 (4~6주)
+  const weeks=Math.ceil((startDay+last.getDate())/7);
+  const total=weeks*7;
+  curWeeks=weeks;
   const cells=[];
   const prevLast=new Date(curYear,curMonth,0);
   for(let i=startDay-1;i>=0;i--){
@@ -183,7 +208,7 @@ function renderCal(){
     const dow=cells.length%7;
     cells.push({d,ds,cls:'',sun:dow===0,sat:dow===6,today:ds===tStr});
   }
-  for(let d=1;cells.length<42;d++){
+  for(let d=1;cells.length<total;d++){
     cells.push({d,ds:fmtDate(curYear,curMonth+1,d),cls:'other',sun:false,sat:false,today:false});
   }
 
@@ -202,8 +227,8 @@ function renderCal(){
   }
 
   // 주 단위로 기간 막대 레인 배치
-  const cellBars=Array.from({length:42},()=>[]);
-  for(let w=0;w<6;w++){
+  const cellBars=Array.from({length:total},()=>[]);
+  for(let w=0;w<weeks;w++){
     const wStart=cells[w*7].ds,wEnd=cells[w*7+6].ds;
     const segs=[];
     ranges.forEach(ev=>{
@@ -233,7 +258,9 @@ function renderCal(){
   const days=['일','월','화','수','목','금','토'];
   days.forEach((d,i)=>h+=`<div class="day-hdr${i===0?' sun':''}${i===6?' sat':''}">${d}</div>`);
   cells.forEach((c,i)=>h+=dayCell(c,dateMap[c.ds]||[],cellBars[i]));
+  grid.style.gridTemplateRows=gridRows(weeks);
   grid.innerHTML=h;
+  requestAnimationFrame(fitHeight);
 
   // 카운트 (해당 월에 걸친 기간 일정 포함)
   const mPre=`${curYear}-${String(curMonth+1).padStart(2,'0')}`;
@@ -392,6 +419,7 @@ async function init(){
 }
 
 listen('data-changed',e=>render(e.payload));
-listen('settings-changed',e=>loadSavedColor(e.payload.calendar_color));
+// 글꼴/크기가 바뀌면 칸 높이도 달라지므로 다시 맞춘다
+listen('settings-changed',e=>{loadSavedColor(e.payload.calendar_color);lastFitH=0;setTimeout(fitHeight,60)});
 init();
 </script></body></html>

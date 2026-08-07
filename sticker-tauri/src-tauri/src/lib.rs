@@ -91,7 +91,8 @@ impl Default for Settings {
             doing: WinGeo { x: 833.0, y: 44.0, w: 405.0, h: 372.0 },
             done: WinGeo { x: 420.0, y: 486.0, w: 404.0, h: 371.0 },
             trash: WinGeo { x: 833.0, y: 486.0, w: 404.0, h: 371.0 },
-            calendar: WinGeo { x: 2.0, y: 44.0, w: 408.0, h: 449.0 },
+            // 세로는 첫 렌더링 때 "그 달의 날짜가 다 보이는 최소 높이"로 자동 조정됨
+            calendar: WinGeo { x: 2.0, y: 44.0, w: 408.0, h: 300.0 },
             autostart: true,
             close_to_tray: true,
             opacity: 1.0,
@@ -500,6 +501,24 @@ fn minimize_window(app: AppHandle, label: String) {
     }
 }
 
+/// 내용이 다 보이는 최소 높이를 창의 최소 크기로 지정하고,
+/// 현재 높이가 그보다 짧으면 늘린다. (가로 크기는 그대로 유지)
+#[tauri::command]
+fn fit_window_height(app: AppHandle, label: String, height: f64) {
+    if let Some(w) = app.get_webview_window(&label) {
+        let need = height.clamp(180.0, 2000.0);
+        let sf = w.scale_factor().unwrap_or(1.0);
+        let _ = w.set_min_size(Some(tauri::LogicalSize::new(260.0, need)));
+        if let Ok(size) = w.inner_size() {
+            let cur_w = size.width as f64 / sf;
+            let cur_h = size.height as f64 / sf;
+            if cur_h + 0.5 < need {
+                let _ = w.set_size(tauri::LogicalSize::new(cur_w, need));
+            }
+        }
+    }
+}
+
 #[tauri::command]
 fn toggle_on_top(app: AppHandle, label: String) -> bool {
     if let Some(w) = app.get_webview_window(&label) {
@@ -676,6 +695,7 @@ pub fn run() {
             add_category, delete_category, rename_category, move_category, reorder_categories,
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity, save_calendar_color,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
+            fit_window_height,
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 오류");
