@@ -1,0 +1,97 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#FAF8F3}
+.strip{background:#5CB85C}
+.hdr{background:#E3EFD9}
+.hdr .tt,.hdr .cnt,.ct button{color:#2E5E2E}
+.gb{flex:1;overflow-y:auto;padding:16px 22px 10px}
+.gb::-webkit-scrollbar{width:6px}
+.gb::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:3px}
+.hero{margin-bottom:14px}
+.hero h1{font-size:calc(var(--fs) + 7px);color:#2E3B2E;margin-bottom:4px}
+.hero p{color:#777;font-size:calc(var(--fs) - 1px);line-height:1.55}
+.ver{display:flex;align-items:center;gap:8px;margin:22px 0 10px;color:#2E7D32;font-weight:bold;font-size:calc(var(--fs) + 1px)}
+.ver .vt{font-size:calc(var(--fs) - 3px);background:#E8F5E9;color:#2E7D32;border-radius:9px;padding:1px 8px;font-weight:600}
+.ver::after{content:'';flex:1;height:1px;background:#DDE8D5}
+.it{background:#fff;border:1px solid #ECE8DF;border-radius:10px;padding:14px 16px 16px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.it h3{font-size:calc(var(--fs) + 1px);margin-bottom:6px;color:#333;display:flex;align-items:center;gap:7px}
+.it h3 .no{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#5CB85C;color:#fff;font-size:11px;flex-shrink:0}
+.it p{font-size:calc(var(--fs) - 1px);color:#555;line-height:1.65;word-break:keep-all}
+.it .shot{margin-top:12px;text-align:center;background:#F3F1EC;border-radius:8px;padding:12px}
+.it .shot img{max-width:100%;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.14);display:inline-block;vertical-align:top}
+.ft{display:flex;gap:8px;justify-content:flex-end;align-items:center;padding:10px 16px;border-top:1px solid #ECE8DF;background:#fff;flex-shrink:0}
+.ft .hint{flex:1;font-size:calc(var(--fs) - 3px);color:#aaa}
+.ft button{padding:7px 16px;border-radius:6px;border:none;cursor:pointer;font-family:inherit;font-size:calc(var(--fs) - 1px);transition:filter .15s}
+.ft button:hover{filter:brightness(.93)}
+.ft .b-never{background:#5CB85C;color:#fff;font-weight:600}
+.ft .b-close{background:#EFEDE6;color:#555}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt" id="tt">Todi 사용법</span></div>
+ <div class="ct" style="opacity:1">
+  <button class="xb" onclick="closeGuide()"><span id="_x"></span></button>
+ </div>
+</div>
+<div class="gb" id="gb"></div>
+<div class="ft">
+ <span class="hint" id="hint"></span>
+ <button class="b-close" onclick="closeGuide()">닫기</button>
+ <button class="b-never" id="bNever" onclick="invoke('dismiss_guide')">다시 보지 않기</button>
+</div>
+
+<script src="common.js"></script>
+<script src="guide.js"></script>
+<script>
+document.getElementById('hI').innerHTML=S.help;
+document.getElementById('_x').innerHTML=S.x;
+
+let state=null;
+
+// mode: 'auto' = 실행 시 자동 (처음 설치 → 전체 / 업데이트 → 새 버전 내용만)
+//       'all'  = 사용법 버튼으로 연 경우 (항상 전체)
+function sections(mode){
+  if(mode==='all'||state.since==null)return GUIDE;
+  return GUIDE.filter(g=>cmpVer(g.version,state.since)>0);
+}
+
+function render(mode){
+  const list=sections(mode);
+  const isNew=mode!=='all'&&state.since!=null;
+  document.getElementById('tt').textContent=isNew?`Todi ${state.version} 새 기능`:'Todi 사용법';
+  document.getElementById('bNever').style.display=mode==='all'?'none':'';
+  document.getElementById('hint').textContent=mode==='all'?'패널의 [사용법] 버튼이나 트레이 메뉴에서 언제든 다시 볼 수 있어요':'닫기만 하면 다음 실행 때 다시 보여요';
+  let h=`<div class="hero">${isNew
+    ?`<h1>업데이트되었어요 🎉</h1><p>Todi가 <b>${esc(state.version)}</b>(으)로 업데이트되었어요. 이번에 새로 생긴 기능을 소개할게요.</p>`
+    :`<h1>Todi에 오신 걸 환영해요 👋</h1><p>책상 위 포스트잇처럼 쓰는 할 일 메모 앱이에요. 아래 순서대로 한 번 훑어보세요.</p>`}</div>`;
+  let no=0;
+  list.forEach(g=>{
+    h+=`<div class="ver">${esc(g.title)}<span class="vt">v${esc(g.version)}</span></div>`;
+    g.items.forEach(it=>{
+      no++;
+      h+=`<div class="it"><h3><span class="no">${no}</span>${esc(it.title)}</h3><p>${it.desc}</p>
+        ${it.img?`<div class="shot"><img src="${it.img}" alt="${esc(it.title)}" onload="halfSize(this)"></div>`:''}</div>`;
+    });
+  });
+  const gb=document.getElementById('gb');
+  gb.innerHTML=h;gb.scrollTop=0;
+  return list.length;
+}
+// 스크린샷은 2배 해상도로 찍었으므로 실제 창 크기대로 보이게 절반으로
+function halfSize(img){img.style.width=Math.round(img.naturalWidth/2)+'px'}
+
+function closeGuide(){invoke('hide_window',{label:'guide'})}
+
+listen('guide-show-all',()=>{if(state)render('all')});
+
+(async()=>{
+  await applyFont();
+  state=await invoke('get_guide_state');
+  if(state.since!=null&&cmpVer(state.since,state.version)>=0)return; // 이미 본 버전
+  // 보여줄 새 내용이 없으면(버그 수정만 있는 업데이트 등) 조용히 본 것으로 처리
+  if(!render('auto')){invoke('dismiss_guide');return}
+  invoke('show_window',{label:'guide'});
+})();
+</script></body></html>

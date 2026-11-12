@@ -67,6 +67,8 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <button class="bt" onclick="invoke('show_window',{label:'done'})" id="dnB">완료</button>
   <button class="bt" onclick="invoke('show_window',{label:'trash'})" id="trB">휴지통</button>
   <button class="bt" onclick="invoke('show_window',{label:'calendar'})" id="calB">달력</button>
+  <button class="bt" onclick="invoke('show_window',{label:'notes'})" id="ntB">메모장</button>
+  <button class="bt" onclick="invoke('open_guide')" id="hpB">사용법</button>
  </div>
  <div class="pn" id="cp"><h3 id="cT"></h3><div id="cl"></div>
   <div class="pb">
@@ -112,6 +114,8 @@ document.getElementById('doB').innerHTML=S.doing+' Doing';
 document.getElementById('dnB').innerHTML=S.done+' 완료';
 document.getElementById('trB').innerHTML=S.trash+' 휴지통';
 document.getElementById('calB').innerHTML=S.cal+' 달력';
+document.getElementById('ntB').innerHTML=S.note+' 메모장';
+document.getElementById('hpB').innerHTML=S.help+' 사용법';
 document.getElementById('micB').innerHTML=S.mic;
 document.getElementById('cT').innerHTML=S.tag+' 카테고리 관리';
 document.getElementById('sT').innerHTML=S.gear+' 설정';

@@ -112,3 +112,8 @@ body{font-family:var(--font);font-size:var(--fs);display:flex;flex-direction:col
 
 /* 날짜 태그 */
 .due-tag{font-size:calc(var(--fs) - 3px);color:#E65100;background:#FFF3E0;padding:1px 5px;border-radius:3px;margin-top:3px;display:inline-block}
+
+/* 항목 클릭 → 메모장 */
+.cd[data-id]{cursor:pointer}
+.note-badge{display:inline-flex;align-items:center;gap:2px;font-size:calc(var(--fs) - 4px);color:#8D6E63;background:rgba(0,0,0,.05);padding:1px 5px 1px 3px;border-radius:8px;margin-left:3px;vertical-align:middle;font-weight:normal}
+.note-badge svg{width:11px;height:11px}

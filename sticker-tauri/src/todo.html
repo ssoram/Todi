@@ -76,8 +76,8 @@ function render(D){
 function card(m){
   const ds=m.description?`<div class="ds">${esc(m.description)}</div>`:'';
   const dt=m.due_date?`<span class="due-tag">(${m.due_date})</span>`:'';
-  return `<div class="cd" data-idx="${m._i}"><span class="cd-dh">⠿</span><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
-    <div class="tx">${esc(m.text)} ${dt}</div>${ds}
+  return `<div class="cd" data-idx="${m._i}" data-id="${m.id}" onclick="openNote(event,${m.id})"><span class="cd-dh">⠿</span><button class="eb" onclick="openEdit(${m._i})">${S.edit}</button>
+    <div class="tx">${esc(m.text)} ${dt}${noteBadge(m)}</div>${ds}
     <div class="btns">
       <button class="b-done" onclick="invoke('complete_memo',{idx:${m._i}})">${S.done}</button>
       <button class="bm-doing" onclick="invoke('move_memo',{idx:${m._i},target:'${TGT}'})">Doing</button>

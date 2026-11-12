@@ -11,8 +11,23 @@ use tauri_plugin_updater::UpdaterExt;
 
 // ════════ 데이터 타입 ════════
 
+/// 항목(메모)에 딸린 상세 메모 한 줄
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct Note {
+    id: u64,
+    text: String,
+    #[serde(default)]
+    created: String,
+    /// 상세 메모를 한 번 더 열었을 때(메모 창) 쓰는 본문
+    #[serde(default)]
+    body: String,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Memo {
+    /// 메모장 탭이 순서 변경/삭제와 무관하게 항목을 가리키기 위한 고유 번호
+    #[serde(default)]
+    id: u64,
     text: String,
     #[serde(default)]
     description: String,
@@ -27,6 +42,8 @@ struct Memo {
     due_date: Option<String>,
     #[serde(default)]
     end_date: Option<String>,
+    #[serde(default)]
+    notes: Vec<Note>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -55,7 +72,17 @@ struct WinGeo {
     h: f64,
 }
 
+/// 고정된 상세 메모 창
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct NoteWin {
+    memo_id: u64,
+    note_id: u64,
+    #[serde(default)]
+    geo: WinGeo,
+}
+
 fn default_opacity() -> f64 { 1.0 }
+fn default_notes_geo() -> WinGeo { WinGeo { x: 1248.0, y: 44.0, w: 420.0, h: 480.0 } }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct Settings {
@@ -79,6 +106,13 @@ struct Settings {
     recent_fonts: Vec<String>,
     #[serde(default)]
     calendar_color: String,
+    #[serde(default = "default_notes_geo")]
+    notes: WinGeo,
+    /// "다시 보지 않기"를 누른 마지막 버전 (빈 값 = 아직 안내를 닫은 적 없음)
+    #[serde(default)]
+    seen_version: String,
+    #[serde(default)]
+    pinned_notes: Vec<NoteWin>,
 }
 
 impl Default for Settings {
@@ -98,6 +132,9 @@ impl Default for Settings {
             opacity: 1.0,
             recent_fonts: vec![],
             calendar_color: String::new(),
+            notes: default_notes_geo(),
+            seen_version: String::new(),
+            pinned_notes: vec![],
         }
     }
 }
@@ -109,16 +146,27 @@ struct Store {
     settings: Mutex<Settings>,
     data_path: PathBuf,
     settings_path: PathBuf,
+    /// 처음 설치해서 저장된 파일이 하나도 없던 경우
+    fresh_install: bool,
+    /// 메모장 창이 아직 로드되지 않았을 때 열어야 할 항목 id
+    pending_note: Mutex<Option<u64>>,
 }
 
 impl Store {
     fn new(dir: PathBuf) -> Self {
         let dp = dir.join("memos.json");
         let sp = dir.join("settings.json");
-        let data: AppData = fs::read_to_string(&dp)
+        let fresh_install = !dp.exists() && !sp.exists();
+        let mut data: AppData = fs::read_to_string(&dp)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
+        // 예전 버전 데이터에는 id가 없으므로 여기서 부여
+        let mut next = data.memos.iter().map(|m| m.id).max().unwrap_or(0);
+        for m in data.memos.iter_mut().filter(|m| m.id == 0) {
+            next += 1;
+            m.id = next;
+        }
         let settings: Settings = fs::read_to_string(&sp)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
@@ -128,6 +176,8 @@ impl Store {
             settings: Mutex::new(settings),
             data_path: dp,
             settings_path: sp,
+            fresh_install,
+            pending_note: Mutex::new(None),
         }
     }
 
@@ -176,10 +226,14 @@ fn get_settings(store: State<Store>) -> Settings {
 #[tauri::command]
 fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String, due_date: Option<String>, end_date: Option<String>) {
     let end_date = end_date.filter(|s| !s.is_empty());
-    store.data.lock().unwrap().memos.push(Memo {
-        text, description: desc, category, status,
+    let mut d = store.data.lock().unwrap();
+    let id = d.memos.iter().map(|m| m.id).max().unwrap_or(0) + 1;
+    d.memos.push(Memo {
+        id, text, description: desc, category, status,
         done: false, done_at: None, prev_status: None, due_date, end_date,
+        notes: vec![],
     });
+    drop(d);
     emit_refresh(&app, &store);
 }
 
@@ -280,6 +334,239 @@ fn move_memo_position(app: AppHandle, store: State<Store>, from: usize, to: usiz
     }
     drop(d);
     emit_refresh(&app, &store);
+}
+
+// ════════ 상세 메모(메모장) 명령 ════════
+
+#[tauri::command]
+fn add_note(app: AppHandle, store: State<Store>, memo_id: u64, text: String) -> u64 {
+    let mut d = store.data.lock().unwrap();
+    let Some(m) = d.memos.iter_mut().find(|m| m.id == memo_id) else { return 0 };
+    let id = m.notes.iter().map(|n| n.id).max().unwrap_or(0) + 1;
+    m.notes.push(Note { id, text, created: Local::now().format("%Y-%m-%d %H:%M").to_string(), body: String::new() });
+    drop(d);
+    emit_refresh(&app, &store);
+    id
+}
+
+#[tauri::command]
+fn edit_note(app: AppHandle, store: State<Store>, memo_id: u64, note_id: u64, text: String) {
+    let mut d = store.data.lock().unwrap();
+    if let Some(n) = d.memos.iter_mut().find(|m| m.id == memo_id)
+        .and_then(|m| m.notes.iter_mut().find(|n| n.id == note_id)) {
+        if n.text == text { return; }
+        n.text = text;
+    }
+    drop(d);
+    emit_refresh(&app, &store);
+}
+
+#[tauri::command]
+fn delete_note(app: AppHandle, store: State<Store>, memo_id: u64, note_id: u64) {
+    let mut d = store.data.lock().unwrap();
+    if let Some(m) = d.memos.iter_mut().find(|m| m.id == memo_id) {
+        m.notes.retain(|n| n.id != note_id);
+    }
+    drop(d);
+    emit_refresh(&app, &store);
+}
+
+/// 목록에서 항목을 눌렀을 때: 메모장 창을 띄우고 해당 항목 탭을 연다
+#[tauri::command]
+fn open_note(app: AppHandle, store: State<Store>, id: u64) {
+    *store.pending_note.lock().unwrap() = Some(id);
+    if let Some(w) = app.get_webview_window("notes") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+    let _ = app.emit_to("notes", "open-note", id);
+}
+
+/// 메모장 창이 처음 로드될 때, 그 전에 요청된 항목이 있으면 가져간다
+#[tauri::command]
+fn take_pending_note(store: State<Store>) -> Option<u64> {
+    store.pending_note.lock().unwrap().take()
+}
+
+#[tauri::command]
+fn edit_note_body(app: AppHandle, store: State<Store>, memo_id: u64, note_id: u64, body: String) {
+    let mut d = store.data.lock().unwrap();
+    if let Some(n) = d.memos.iter_mut().find(|m| m.id == memo_id)
+        .and_then(|m| m.notes.iter_mut().find(|n| n.id == note_id)) {
+        if n.body == body { return; }
+        n.body = body;
+    }
+    drop(d);
+    emit_refresh(&app, &store);
+}
+
+// ════════ 상세 메모 창 (메모장에서 한 번 더 열기) ════════
+// 창 라벨: note-{항목 id}-{메모 id}
+// 고정하지 않은 창은 다른 메모를 열거나 메모장에서 다른 탭을 누르면 닫힌다.
+
+fn note_label(memo_id: u64, note_id: u64) -> String {
+    format!("note-{memo_id}-{note_id}")
+}
+
+fn is_pinned_label(store: &Store, label: &str) -> bool {
+    store.settings.lock().unwrap().pinned_notes.iter()
+        .any(|p| note_label(p.memo_id, p.note_id) == label)
+}
+
+fn win_geo(w: &tauri::WebviewWindow) -> Option<WinGeo> {
+    let sf = w.scale_factor().unwrap_or(1.0);
+    let (pos, size) = (w.outer_position().ok()?, w.inner_size().ok()?);
+    Some(WinGeo {
+        x: pos.x as f64 / sf,
+        y: pos.y as f64 / sf,
+        w: size.width as f64 / sf,
+        h: size.height as f64 / sf,
+    })
+}
+
+fn close_unpinned_notes(app: &AppHandle, except: Option<&str>) {
+    let store = app.state::<Store>();
+    for (label, w) in app.webview_windows() {
+        if label.starts_with("note-") && Some(label.as_str()) != except && !is_pinned_label(&store, &label) {
+            let _ = w.close();
+        }
+    }
+}
+
+fn build_note_window(app: &AppHandle, memo_id: u64, note_id: u64, geo: &WinGeo) -> tauri::Result<()> {
+    WebviewWindowBuilder::new(app, note_label(memo_id, note_id), WebviewUrl::App("note.html".into()))
+        .title("상세 메모")
+        .decorations(false)
+        .inner_size(if geo.w > 0.0 { geo.w } else { 320.0 }, if geo.h > 0.0 { geo.h } else { 340.0 })
+        .position(geo.x, geo.y)
+        .min_inner_size(220.0, 160.0)
+        .build()?;
+    let opacity = app.state::<Store>().settings.lock().unwrap().opacity;
+    if opacity < 1.0 {
+        apply_window_opacity(app, opacity);
+    }
+    Ok(())
+}
+
+fn emit_note_pins(app: &AppHandle) {
+    let pins = app.state::<Store>().settings.lock().unwrap().pinned_notes.clone();
+    let _ = app.emit("note-pins-changed", &pins);
+}
+
+/// 메모장의 상세 메모를 눌렀을 때: 그 메모만 따로 창으로 연다 (창 생성은 async 명령에서)
+#[tauri::command]
+async fn open_note_window(app: AppHandle, memo_id: u64, note_id: u64) -> Result<(), String> {
+    let label = note_label(memo_id, note_id);
+    close_unpinned_notes(&app, Some(&label));
+    if let Some(w) = app.get_webview_window(&label) {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+        return Ok(());
+    }
+    // 메모장 창 오른쪽에 붙여서 띄우고, 여러 개면 조금씩 어긋나게
+    let n = app.webview_windows().keys().filter(|l| l.starts_with("note-")).count() as f64;
+    let geo = app.get_webview_window("notes").and_then(|w| win_geo(&w))
+        .map(|g| WinGeo { x: g.x + g.w + 8.0 + n * 24.0, y: g.y + n * 24.0, w: 320.0, h: 340.0 })
+        .unwrap_or(WinGeo { x: 300.0 + n * 24.0, y: 120.0 + n * 24.0, w: 320.0, h: 340.0 });
+    build_note_window(&app, memo_id, note_id, &geo).map_err(|e| e.to_string())
+}
+
+/// 메모장에서 다른 탭(항목)으로 넘어갈 때 고정 안 된 메모 창 닫기
+#[tauri::command]
+fn close_unpinned_note_windows(app: AppHandle) {
+    close_unpinned_notes(&app, None);
+}
+
+#[tauri::command]
+fn get_note_pins(store: State<Store>) -> Vec<NoteWin> {
+    store.settings.lock().unwrap().pinned_notes.clone()
+}
+
+/// 메모 창의 고정 버튼. 고정된 창은 다음 실행 때도 그 자리에 다시 뜬다.
+#[tauri::command]
+fn toggle_note_pin(app: AppHandle, window: tauri::WebviewWindow, store: State<Store>, memo_id: u64, note_id: u64) -> bool {
+    let mut s = store.settings.lock().unwrap();
+    let pinned = if let Some(i) = s.pinned_notes.iter().position(|p| p.memo_id == memo_id && p.note_id == note_id) {
+        s.pinned_notes.remove(i);
+        false
+    } else {
+        let geo = win_geo(&window).unwrap_or_default();
+        s.pinned_notes.push(NoteWin { memo_id, note_id, geo });
+        true
+    };
+    drop(s);
+    store.save_settings();
+    emit_note_pins(&app);
+    pinned
+}
+
+/// 메모 창 닫기 (X 버튼, 또는 메모가 삭제된 경우). 고정되어 있었다면 고정도 해제.
+#[tauri::command]
+fn close_note_window(app: AppHandle, window: tauri::WebviewWindow, store: State<Store>) {
+    let label = window.label().to_string();
+    let mut s = store.settings.lock().unwrap();
+    let before = s.pinned_notes.len();
+    s.pinned_notes.retain(|p| note_label(p.memo_id, p.note_id) != label);
+    let changed = s.pinned_notes.len() != before;
+    drop(s);
+    if changed {
+        store.save_settings();
+        emit_note_pins(&app);
+    }
+    let _ = window.close();
+}
+
+// ════════ 사용법 / 새 기능 안내 ════════
+
+/// 안내 기능이 처음 들어간 버전 바로 전 버전.
+/// 이 버전에서 업데이트한 사용자는 "새로 추가된 내용"만 보게 된다.
+const LAST_VERSION_WITHOUT_GUIDE: &str = "1.1.3";
+
+#[derive(Serialize)]
+struct GuideState {
+    version: String,
+    /// None이면 처음 설치 → 사용법 전체, Some(v)면 v보다 새 버전 내용만
+    since: Option<String>,
+}
+
+#[tauri::command]
+fn get_guide_state(app: AppHandle, store: State<Store>) -> GuideState {
+    let seen = store.settings.lock().unwrap().seen_version.clone();
+    let since = if !seen.is_empty() {
+        Some(seen)
+    } else if store.fresh_install {
+        None
+    } else {
+        Some(LAST_VERSION_WITHOUT_GUIDE.to_string())
+    };
+    GuideState { version: app.package_info().version.to_string(), since }
+}
+
+/// "다시 보지 않기": 현재 버전까지 본 것으로 기록
+#[tauri::command]
+fn dismiss_guide(app: AppHandle, store: State<Store>) {
+    store.settings.lock().unwrap().seen_version = app.package_info().version.to_string();
+    store.save_settings();
+    if let Some(w) = app.get_webview_window("guide") {
+        let _ = w.hide();
+    }
+}
+
+/// 패널/트레이에서 "사용법" 버튼: 언제든 전체 사용법 보기
+#[tauri::command]
+fn open_guide(app: AppHandle) {
+    show_full_guide(&app);
+}
+
+fn show_full_guide(app: &AppHandle) {
+    let _ = app.emit_to("guide", "guide-show-all", ());
+    if let Some(w) = app.get_webview_window("guide") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
 }
 
 // ════════ 카테고리 명령 ════════
@@ -410,8 +697,11 @@ fn apply_window_opacity(app: &AppHandle, opacity: f64) {
     #[cfg(target_os = "windows")]
     {
         use windows_sys::Win32::UI::WindowsAndMessaging::*;
-        for label in ["panel", "todo", "doing", "done", "trash", "calendar"] {
-            if let Some(w) = app.get_webview_window(label) {
+        let mut labels: Vec<String> = ["panel", "todo", "doing", "done", "trash", "calendar", "notes"]
+            .iter().map(|s| s.to_string()).collect();
+        labels.extend(app.webview_windows().into_keys().filter(|l| l.starts_with("note-")));
+        for label in labels {
+            if let Some(w) = app.get_webview_window(&label) {
                 if let Ok(hwnd) = w.hwnd() {
                     let h = hwnd.0 as *mut std::ffi::c_void;
                     unsafe {
@@ -463,6 +753,7 @@ fn close_window(app: AppHandle, store: State<Store>, label: String) {
                 "done"  => s.done = geo,
                 "trash" => s.trash = geo,
                 "calendar" => s.calendar = geo,
+                "notes" => s.notes = geo,
                 _ => {}
             }
             drop(s);
@@ -534,7 +825,12 @@ fn toggle_on_top(app: AppHandle, label: String) -> bool {
 fn save_and_exit(app: &AppHandle) {
     let store = app.state::<Store>();
     let mut s = store.settings.lock().unwrap();
-    for label in ["panel", "todo", "doing", "done", "trash", "calendar"] {
+    for p in s.pinned_notes.iter_mut() {
+        if let Some(g) = app.get_webview_window(&note_label(p.memo_id, p.note_id)).and_then(|w| win_geo(&w)) {
+            p.geo = g;
+        }
+    }
+    for label in ["panel", "todo", "doing", "done", "trash", "calendar", "notes"] {
         if let Some(w) = app.get_webview_window(label) {
             // 숨겨진 창은 크기가 정확하지 않으므로 건너뛰기
             if !w.is_visible().unwrap_or(false) { continue; }
@@ -554,6 +850,7 @@ fn save_and_exit(app: &AppHandle) {
                     "done"  => s.done = geo,
                     "trash" => s.trash = geo,
                     "calendar" => s.calendar = geo,
+                    "notes" => s.notes = geo,
                     _ => {}
                 }
             }
@@ -595,6 +892,7 @@ pub fn run() {
                 ("done",  "done.html",   &settings.done,  false),
                 ("trash", "trash.html",  &settings.trash,  false),
                 ("calendar", "calendar.html", &settings.calendar, true),
+                ("notes", "notes.html", &settings.notes, false),
             ];
 
             for (label, url, geo, visible) in wins {
@@ -608,6 +906,7 @@ pub fn run() {
                     "done"  => "완료 목록",
                     "trash" => "휴지통",
                     "calendar" => "달력",
+                    "notes" => "메모장",
                     _ => "",
                 })
                 .decorations(false)
@@ -616,6 +915,27 @@ pub fn run() {
                 .visible(visible)
                 .min_inner_size(260.0, 180.0)
                 .build()?;
+            }
+
+            // 사용법/새 기능 안내 창 — 숨긴 채로 만들고, 보여줄 내용이 있으면 창 스스로 띄운다
+            WebviewWindowBuilder::new(app, "guide", WebviewUrl::App("guide.html".into()))
+                .title("Todi 사용법")
+                .decorations(false)
+                .inner_size(560.0, 680.0)
+                .min_inner_size(380.0, 320.0)
+                .center()
+                .visible(false)
+                .build()?;
+
+            // 고정해 둔 상세 메모 창 다시 띄우기 (그 사이 지워진 메모는 건너뜀)
+            {
+                let data = app.state::<Store>().data.lock().unwrap().clone();
+                for p in &settings.pinned_notes {
+                    let exists = data.memos.iter().any(|m| m.id == p.memo_id && m.notes.iter().any(|n| n.id == p.note_id));
+                    if exists {
+                        let _ = build_note_window(app.handle(), p.memo_id, p.note_id, &p.geo);
+                    }
+                }
             }
 
             // 투명도 적용
@@ -634,6 +954,9 @@ pub fn run() {
                 .text("show_done", "완료 목록")
                 .text("show_trash", "휴지통")
                 .text("show_calendar", "달력")
+                .text("show_notes", "메모장")
+                .separator()
+                .text("show_guide", "사용법 보기")
                 .separator()
                 .text("quit", "종료")
                 .build()?;
@@ -648,14 +971,16 @@ pub fn run() {
                 .on_menu_event(|app, event| {
                     match event.id().as_ref() {
                         "quit" => save_and_exit(app),
+                        "show_guide" => show_full_guide(app),
                         id => {
                             let label = match id {
                                 "show_panel" => "panel",
                                 "show_todo" => "todo",
                                 "show_doing" => "doing",
                                 "show_done" => "done",
-                        "show_trash" => "trash",
+                                "show_trash" => "trash",
                                 "show_calendar" => "calendar",
+                                "show_notes" => "notes",
                                 _ => return,
                             };
                             if let Some(w) = app.get_webview_window(label) {
@@ -696,6 +1021,9 @@ pub fn run() {
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity, save_calendar_color,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
             fit_window_height,
+            add_note, edit_note, delete_note, open_note, take_pending_note,
+            get_guide_state, dismiss_guide, open_guide,
+            edit_note_body, open_note_window, close_unpinned_note_windows, get_note_pins, toggle_note_pin, close_note_window,
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 오류");

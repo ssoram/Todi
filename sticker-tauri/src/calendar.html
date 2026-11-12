@@ -20,9 +20,12 @@ body{background:var(--cal-bg,#FFF5F0)}
 .day:hover{background:rgba(0,0,0,.04)}
 .day.today{border-color:var(--cal-accent,#FF8A65);background:rgba(255,138,101,.08)}
 .day.other .dn,.day.other .items{opacity:.35}
-.day .dn{font-size:calc(var(--fs) - 2px);font-weight:bold;margin-bottom:2px;color:#555}
+.day .dn{font-size:calc(var(--fs) - 2px);font-weight:bold;margin-bottom:2px;color:#555;display:flex;align-items:baseline;gap:3px;min-width:0}
 .day.sun .dn{color:#E53935}
 .day.sat .dn{color:#1565C0}
+/* 공휴일 — 날짜는 빨간색, 옆에 작게 공휴일 이름 */
+.day.holi .dn{color:#E53935}
+.day .dn .hn{font-size:calc(var(--fs) - 4px);font-weight:600;color:#E53935;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;line-height:1.1}
 .day .items{font-size:var(--fs)}
 .day .di{padding:1px 3px;border-radius:2px;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:rgba(0,0,0,.04);font-weight:500}
 .day .di.done-item{text-decoration:line-through;opacity:.5}
@@ -113,6 +116,7 @@ body{background:var(--cal-bg,#FFF5F0)}
 </div></div>
 
 <script src="common.js"></script>
+<script src="holidays.js"></script>
 <script>
 document.getElementById('hI').innerHTML=S.cal;
 document.getElementById('pinB').innerHTML=S.unpin;
@@ -288,6 +292,8 @@ function catColor(cat){
 function dayCell(c,items,bars){
   let extra='';
   if(c.sun)extra+=' sun';if(c.sat)extra+=' sat';if(c.today)extra+=' today';
+  const hol=holidayName(c.ds);
+  if(hol)extra+=' holi';
   // 기간 막대 (빈 레인은 투명 스페이서로 정렬 유지)
   let bh='';
   for(let l=0;l<bars.length;l++){
@@ -306,14 +312,15 @@ function dayCell(c,items,bars){
     ih+=`<div class="di${m.done?' done-item':''}${sc}" style="color:${clr}">${esc(m.text)}</div>`;
   });
   if(items.length>showN)ih+=`<div class="di" style="color:#999">+${items.length-showN}</div>`;
-  return `<div class="day ${c.cls}${extra}" onclick="openDay('${c.ds}')" title="${c.ds}">
-    <div class="dn">${c.d}</div>${bh}<div class="items">${ih}</div></div>`;
+  return `<div class="day ${c.cls}${extra}" onclick="openDay('${c.ds}')" title="${c.ds}${hol?' '+hol:''}">
+    <div class="dn"><span>${c.d}</span>${hol?`<span class="hn">${esc(hol)}</span>`:''}</div>${bh}<div class="items">${ih}</div></div>`;
 }
 
 // ── 날짜 상세 팝업 ──
 function openDay(date){
   selDate=date;
-  document.getElementById('dayTitle').textContent=date;
+  const hol=holidayName(date);
+  document.getElementById('dayTitle').innerHTML=esc(date)+(hol?` <span style="color:#E53935;font-size:calc(var(--fs) - 2px)">${esc(hol)}</span>`:'');
   renderDayList(date);
   document.getElementById('dayPop').classList.add('show');
 }
@@ -329,8 +336,8 @@ function renderDayList(date){
     const clr=catColor(m.category);
     const desc=m.description?`<div class="dl-desc">${esc(m.description)}</div>`:'';
     const stLabel=m.status==='schedule'?'일정':m.status==='done'?'완료':m.status==='doing'?'진행중':'할일';
-    h+=`<div class="dl-item${m.done?' done-item':''}" style="border-left:3px solid ${clr}">
-      <div class="dl-title">${esc(m.text)}</div>${desc}
+    h+=`<div class="dl-item${m.done?' done-item':''}" style="border-left:3px solid ${clr};cursor:pointer" onclick="openNote(event,${m.id})" title="클릭하면 상세 메모가 열립니다">
+      <div class="dl-title">${esc(m.text)}${noteBadge(m)}</div>${desc}
       <div><span class="dl-cat" style="color:${clr}">${esc(m.category)}</span><span class="dl-status">${stLabel}</span>${m.end_date&&m.end_date>m.due_date?`<span class="dl-status">${m.due_date} ~ ${m.end_date}</span>`:''}</div>
       <div class="dl-btns">
         <button style="background:#D6EAFF;color:#1565C0" onclick="openEdit(${m._i})">${S.edit} 수정</button>

@@ -1,0 +1,296 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#FBF7EF}
+.strip{background:#A1887F}
+.hdr{background:#D7CCC8}
+.hdr .tt,.hdr .cnt,.ct button{color:#4E342E}
+
+/* ── 탭 바 ── */
+.tabs{display:flex;gap:2px;padding:6px 6px 0;background:#EFEBE9;flex-shrink:0;overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:3px;max-width:170px;min-width:64px;padding:5px 4px 5px 10px;border-radius:6px 6px 0 0;background:#E0D7D3;color:#6D4C41;cursor:pointer;font-size:calc(var(--fs) - 2px);user-select:none;flex:0 1 auto;transition:background .15s}
+.tab:hover{background:#D7CCC8}
+.tab.on{background:#FBF7EF;color:#3E2723;font-weight:600;flex-shrink:0}
+/* 고정한 탭은 앞쪽에 모이고 X가 없음 (인터넷 창의 고정 탭처럼) */
+.tab.pinned{flex-shrink:0;max-width:130px;background:#E8DCD6}
+.tab.pinned.on{background:#FBF7EF}
+/* 끌어서 순서 바꾸기 */
+.tab.drag{opacity:.85;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2;position:relative;cursor:grabbing}
+.tabs.dragging .tab{transition:none}
+.tab .tl{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tab button{background:none;border:none;cursor:pointer;color:inherit;padding:2px 3px;border-radius:3px;display:flex;align-items:center;opacity:.35;transition:opacity .15s,background .15s}
+.tab button:hover{opacity:1;background:rgba(0,0,0,.08)}
+.tab.pinned .tp{opacity:.9;color:#D84315}
+.tab button svg{width:12px;height:12px}
+
+/* ── 본문 ── */
+.nb{flex:1;display:flex;flex-direction:column;min-height:0}
+.mh{padding:10px 14px 6px;flex-shrink:0}
+.mh .mt{font-weight:bold;font-size:calc(var(--fs) + 1px);color:#3E2723;word-break:break-word}
+.mh .mi{display:flex;gap:5px;align-items:center;margin-top:4px;flex-wrap:wrap}
+.chip{font-size:calc(var(--fs) - 4px);padding:1px 7px;border-radius:8px;background:rgba(0,0,0,.06);color:#6D4C41}
+.chip.st-todo{background:#FFF3D0;color:#8D6E00}
+.chip.st-doing{background:#DCEEFB;color:#1A3A5C}
+.chip.st-done{background:#E8F5E9;color:#2E7D32}
+.chip.st-trash{background:#EEE;color:#757575}
+.chip.st-schedule{background:#FFE0D6;color:#BF360C}
+.mh .md{font-size:calc(var(--fs) - 2px);color:#8D8D8D;margin-top:5px;white-space:pre-wrap;word-break:break-word}
+
+.nl{flex:1;overflow-y:auto;padding:4px 12px 8px}
+.nl::-webkit-scrollbar{width:5px}
+.nl::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:3px}
+/* 메모 한 줄 — 줄 노트 느낌 */
+.ni{position:relative;display:flex;gap:6px;align-items:flex-start;padding:6px 4px 4px;border-bottom:1px dashed #E3D9CF}
+.ni .bul{color:#BCAAA4;font-size:calc(var(--fs) - 2px);line-height:1.55;padding-top:1px;user-select:none}
+.ni textarea{flex:1;border:none;background:transparent;resize:none;outline:none;font-family:inherit;font-size:var(--fs);line-height:1.55;color:#333;overflow:hidden;min-height:1.55em;padding:0}
+.ni textarea:focus{background:rgba(255,255,255,.7);box-shadow:0 0 0 3px rgba(255,255,255,.7);border-radius:2px}
+.ni .nt{font-size:calc(var(--fs) - 5px);color:#C0B4AC;white-space:nowrap;padding-top:3px}
+.ni .nd{background:none;border:none;cursor:pointer;color:#C62828;opacity:0;padding:2px 3px;border-radius:3px;display:flex;align-items:center;transition:opacity .15s}
+.ni:hover .nd{opacity:.45}
+.ni .nd:hover{opacity:1;background:#FFE0E0}
+/* 상세 메모 한 번 더 열기 */
+.ni .no{background:none;border:none;cursor:pointer;color:#6D4C41;opacity:0;padding:2px 3px;border-radius:3px;display:flex;align-items:center;transition:opacity .15s}
+.ni:hover .no{opacity:.5}
+.ni .no:hover{opacity:1;background:rgba(0,0,0,.07)}
+.ni .nflag{display:flex;gap:2px;align-items:center;padding-top:3px;color:#A1887F}
+.ni .nflag svg{width:11px;height:11px}
+.ni .nflag .pf{color:#D84315}
+.ni.opened{background:rgba(255,236,179,.35)}
+.nl .none{color:#BCAAA4;text-align:center;padding:22px 10px;font-size:calc(var(--fs) - 1px)}
+
+/* 새 메모 입력 */
+.na{display:flex;gap:4px;align-items:flex-end;padding:8px 10px 10px;border-top:1px solid #EFE7DD;flex-shrink:0;background:#F7F1E7}
+.na textarea{flex:1;padding:7px 10px;border:1px solid #D7CCC8;border-radius:5px;font-size:calc(var(--fs) - 1px);font-family:inherit;outline:none;background:#fff;resize:none;max-height:120px;line-height:1.45}
+.na textarea:focus{border-color:#A1887F}
+.na .add{padding:7px 12px;background:#8D6E63;color:#fff;border:none;border-radius:5px;cursor:pointer;font-family:inherit;font-size:calc(var(--fs) - 1px);display:flex;align-items:center;gap:3px;white-space:nowrap}
+.na .add:hover{background:#795548}
+
+.welcome{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#A1887F;text-align:center;padding:20px;gap:8px;line-height:1.6;font-size:calc(var(--fs) - 1px)}
+.welcome svg{width:34px;height:34px;opacity:.5}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt">메모장</span><span class="cnt" id="cnt"></span></div>
+ <div class="ct">
+  <button id="pinB" onclick="togglePosLock()" title="창 위치 고정"></button>
+  <button onclick="invoke('minimize_window',{label:'notes'})"><span id="_min"></span></button>
+  <button class="xb" onclick="invoke('close_window',{label:'notes'})"><span id="_x"></span></button>
+ </div>
+</div>
+<div class="tabs" id="tabs"></div>
+<div class="nb" id="nb"></div>
+
+<script src="common.js"></script>
+<script>
+document.getElementById('hI').innerHTML=S.note;
+document.getElementById('pinB').innerHTML=S.unpin;
+document.getElementById('_min').innerHTML=S.min;
+document.getElementById('_x').innerHTML=S.x;
+
+const ST_LABEL={todo:'할 일',doing:'하고 있는 일',done:'완료',trash:'휴지통',schedule:'일정'};
+const LS_KEY='todi.noteTabs';
+
+// tabs: [{id, pinned}] — 인터넷 창처럼 X를 눌러야 닫히고, 열어 둔 탭은 다음 실행 때도 남는다
+let tabs=[],active=null,D=null;
+try{
+  const saved=JSON.parse(localStorage.getItem(LS_KEY)||'null');
+  if(saved&&Array.isArray(saved.tabs)){tabs=saved.tabs;active=tabs.some(t=>t.id===saved.active)?saved.active:(tabs[0]||{}).id??null}
+}catch(e){}
+function saveTabs(){try{localStorage.setItem(LS_KEY,JSON.stringify({tabs,active}))}catch(e){}}
+// 고정한 탭은 항상 앞쪽 (각 묶음 안의 순서는 유지)
+function sortPinned(){tabs=[...tabs.filter(t=>t.pinned),...tabs.filter(t=>!t.pinned)]}
+
+const memoOf=id=>D?D.memos.find(m=>m.id===id):null;
+
+// ── 탭 동작 ──
+function openMemo(id){
+  flushAll();
+  if(id!==active)invoke('close_unpinned_note_windows');
+  if(!tabs.some(t=>t.id===id))tabs.push({id,pinned:false});
+  active=id;saveTabs();render(true);
+  setTimeout(()=>{const a=document.getElementById('naT');if(a)a.focus()},30);
+}
+function clickTab(id){if(id===active)return;openMemo(id)}
+function togglePinTab(id){const t=tabs.find(t=>t.id===id);if(t){t.pinned=!t.pinned;sortPinned();saveTabs();renderTabs()}}
+function closeTab(id){
+  flushAll();
+  const i=tabs.findIndex(t=>t.id===id);if(i<0)return;
+  tabs.splice(i,1);
+  if(active===id){const n=tabs[i]||tabs[i-1];active=n?n.id:null}
+  saveTabs();render(true);
+}
+
+// ── 그리기 ──
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  if(!tabs.length){el.style.display='none';return}
+  el.style.display='flex';
+  el.innerHTML=tabs.map(t=>{
+    const m=memoOf(t.id);const title=m?m.text:'(삭제된 항목)';
+    return `<div class="tab${t.id===active?' on':''}${t.pinned?' pinned':''}" data-id="${t.id}" title="${esc(title)}${t.pinned?' (고정됨 — 고정을 풀어야 닫을 수 있어요)':''}">
+      <span class="tl">${esc(title)}</span>
+      <button class="tp" onclick="event.stopPropagation();togglePinTab(${t.id})" title="${t.pinned?'고정 해제':'탭 고정 (앞쪽에 고정, 실수로 닫히지 않음)'}">${t.pinned?S.pin:S.unpin}</button>
+      ${t.pinned?'':`<button onclick="event.stopPropagation();closeTab(${t.id})" title="탭 닫기">${S.x}</button>`}
+    </div>`;
+  }).join('');
+  const on=el.querySelector('.tab.on');if(on)on.scrollIntoView({block:'nearest',inline:'nearest'});
+}
+
+// ── 탭 끌어서 순서 바꾸기 (누르기만 하면 탭 선택) ──
+(function(){
+  const bar=document.getElementById('tabs');
+  bar.addEventListener('pointerdown',e=>{
+    const tab=e.target.closest('.tab');
+    if(!tab||e.button!==0||e.target.closest('button'))return;
+    const id=+tab.dataset.id,x0=e.clientX;
+    let dragging=false;
+    const move=ev=>{
+      if(!dragging){
+        if(Math.abs(ev.clientX-x0)<5)return;
+        dragging=true;tab.classList.add('drag');bar.classList.add('dragging');
+        try{tab.setPointerCapture(e.pointerId)}catch(_){}
+      }
+      // 같은 묶음(고정/비고정) 안에서 마우스 위치에 맞춰 자리 바꾸기
+      const pinned=tab.classList.contains('pinned');
+      const others=[...bar.querySelectorAll('.tab')].filter(t=>t!==tab&&t.classList.contains('pinned')===pinned);
+      let before=null;
+      for(const o of others){const r=o.getBoundingClientRect();if(ev.clientX<r.left+r.width/2){before=o;break}}
+      if(before){if(tab.nextElementSibling!==before)bar.insertBefore(tab,before)}
+      else{const last=others[others.length-1];if(last&&last.nextElementSibling!==tab)bar.insertBefore(tab,last.nextElementSibling)}
+    };
+    const up=()=>{
+      document.removeEventListener('pointermove',move);
+      document.removeEventListener('pointerup',up);
+      if(!dragging){clickTab(id);return}
+      tab.classList.remove('drag');bar.classList.remove('dragging');
+      const order=[...bar.querySelectorAll('.tab')].map(t=>+t.dataset.id);
+      tabs.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
+      sortPinned();saveTabs();renderTabs();
+    };
+    document.addEventListener('pointermove',move);
+    document.addEventListener('pointerup',up);
+  });
+})();
+
+let shownKey='';
+function render(force){
+  if(!D)return;
+  // 삭제(영구삭제)된 항목의 탭은 정리
+  const before=tabs.length;
+  tabs=tabs.filter(t=>memoOf(t.id));
+  if(active!==null&&!memoOf(active))active=(tabs[0]||{}).id??null;
+  if(tabs.length!==before)saveTabs();
+  renderTabs();
+  const nb=document.getElementById('nb');
+  const m=active!==null?memoOf(active):null;
+  document.getElementById('cnt').textContent=m?`${(m.notes||[]).length}개`:'';
+  if(!m){
+    shownKey='';
+    nb.innerHTML=`<div class="welcome">${S.note}<div><b>할 일 · 하고 있는 일 · 완료 · 달력</b>의 항목을 누르면<br>그 항목의 상세 메모가 여기에 탭으로 열려요.</div>
+      <div style="font-size:calc(var(--fs) - 3px)">탭은 X를 눌러야 닫히고, 끌어서 순서를 바꿀 수 있어요.</div></div>`;
+    return;
+  }
+  const key=m.id+':'+(m.notes||[]).map(n=>n.id+(n.body?'b':'')+(isNotePinned(m.id,n.id)?'p':'')).join(',');
+  const focused=document.activeElement;
+  // 같은 항목/같은 메모 목록이면 입력 중인 칸을 건드리지 않고 값만 갱신
+  if(!force&&key===shownKey){
+    nb.querySelector('.mt').textContent=m.text;
+    nb.querySelector('.mi').innerHTML=chips(m);
+    (m.notes||[]).forEach(n=>{
+      const ta=nb.querySelector(`textarea[data-nid="${n.id}"]`);
+      if(ta&&ta!==focused&&!pending[n.id]&&ta.value!==n.text){ta.value=n.text;grow(ta)}
+    });
+    return;
+  }
+  // 새 메모 입력칸의 내용/포커스는 유지
+  const draft=document.getElementById('naT');
+  const draftVal=draft&&shownKey.split(':')[0]===String(m.id)?draft.value:'';
+  const draftFocus=draft&&focused===draft;
+  shownKey=key;
+  const notes=m.notes||[];
+  nb.innerHTML=`<div class="mh">
+      <div class="mt">${esc(m.text)}</div>
+      <div class="mi">${chips(m)}</div>
+      ${m.description?`<div class="md">${esc(m.description)}</div>`:''}
+    </div>
+    <div class="nl" id="nl">${notes.length?notes.map(n=>`<div class="ni">
+        <span class="bul">•</span>
+        <textarea rows="1" data-nid="${n.id}" oninput="onEdit(this)" onblur="flush(${n.id})">${esc(n.text)}</textarea>
+        <span class="nflag">${n.body?`<span title="본문 있음">${S.note}</span>`:''}${isNotePinned(m.id,n.id)?`<span class="pf" title="고정된 메모 창">${S.pin}</span>`:''}</span>
+        <span class="nt">${esc((n.created||'').slice(5))}</span>
+        <button class="no" onclick="openNoteWin(${n.id})" title="이 메모 따로 열기">${S.open}</button>
+        <button class="nd" onclick="delNote(${n.id})" title="삭제">${S.trash}</button>
+      </div>`).join(''):'<div class="none">아직 상세 메모가 없어요.<br>아래에 입력하고 Enter를 누르면 추가돼요.</div>'}</div>
+    <div class="na">
+      <textarea id="naT" rows="1" placeholder="상세 메모 입력 후 Enter (줄바꿈: Shift+Enter)"></textarea>
+      <button class="mic-btn" onclick="startVoice(this,document.getElementById('naT'))">${S.mic}</button>
+      <button class="add" onclick="addNote()">${S.plus} 추가</button>
+    </div>`;
+  nb.querySelectorAll('.nl textarea').forEach(grow);
+  const na=document.getElementById('naT');
+  na.value=draftVal;grow(na);
+  na.addEventListener('input',()=>grow(na));
+  na.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();addNote()}});
+  if(draftFocus)na.focus();
+}
+function chips(m){
+  let h=`<span class="chip st-${m.status}">${ST_LABEL[m.status]||m.status}</span><span class="chip">${esc(m.category)}</span>`;
+  if(m.due_date)h+=`<span class="chip">${m.due_date}${m.end_date&&m.end_date>m.due_date?' ~ '+m.end_date:''}</span>`;
+  return h;
+}
+function grow(ta){ta.style.height='auto';ta.style.height=ta.scrollHeight+'px'}
+
+// ── 메모 추가/수정/삭제 ──
+async function addNote(){
+  const na=document.getElementById('naT');if(!na||active===null)return;
+  const t=na.value.trim();if(!t)return;
+  na.value='';grow(na);
+  await invoke('add_note',{memoId:active,text:t});
+  const nl=document.getElementById('nl');if(nl)nl.scrollTop=nl.scrollHeight;
+  na.focus();
+}
+// 입력 중에는 0.5초 쉬면 저장, 칸을 벗어나면 즉시 저장
+const pending={};
+function onEdit(ta){
+  grow(ta);
+  const nid=+ta.dataset.nid,mid=active;
+  clearTimeout((pending[nid]||{}).t);
+  pending[nid]={mid,t:setTimeout(()=>flush(nid),500)};
+}
+function flush(nid){
+  const p=pending[nid];if(!p)return;
+  clearTimeout(p.t);delete pending[nid];
+  const ta=document.querySelector(`textarea[data-nid="${nid}"]`);
+  if(ta)invoke('edit_note',{memoId:p.mid,noteId:nid,text:ta.value});
+}
+function flushAll(){Object.keys(pending).forEach(k=>flush(+k))}
+async function delNote(nid){
+  const ta=document.querySelector(`textarea[data-nid="${nid}"]`);
+  if(ta&&ta.value.trim()&&!(await customConfirm('이 상세 메모를 삭제할까요?')))return;
+  clearTimeout((pending[nid]||{}).t);delete pending[nid];
+  invoke('delete_note',{memoId:active,noteId:nid});
+}
+
+// ── 상세 메모 한 번 더 열기 (따로 뜨는 메모 창) ──
+let notePins=[];
+function isNotePinned(mid,nid){return notePins.some(p=>p.memo_id===mid&&p.note_id===nid)}
+function openNoteWin(nid){flush(nid);invoke('open_note_window',{memoId:active,noteId:nid})}
+listen('note-pins-changed',e=>{notePins=e.payload||[];render(false)});
+invoke('get_note_pins').then(p=>{notePins=p||[];render(false)}).catch(()=>{});
+
+// ── 이벤트 ──
+listen('data-changed',e=>{D=e.payload;render(false)});
+listen('open-note',e=>{invoke('take_pending_note');if(D)openMemo(e.payload);else _queued=e.payload});
+let _queued=null;
+window.addEventListener('beforeunload',flushAll);
+
+(async()=>{
+  await applyFont();
+  try{D=await invoke('get_all_data')}catch(e){return}
+  const p=await invoke('take_pending_note').catch(()=>null);
+  const first=_queued??p;
+  if(first!=null)openMemo(first);else render(true);
+})();
+</script></body></html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="styles.css">
+<style>
+body{background:#FFFBEA}
+.strip{background:#FFCA28}
+.hdr{background:#FFF0B3}
+.hdr .tt,.hdr .cnt,.ct button{color:#5D4600}
+.hdr .lf{min-width:0;flex:1}
+.hdr .tt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:calc(var(--fs) - 2px);font-weight:600;opacity:.75}
+/* 고정 버튼은 고정 상태가 보이도록 항상 표시 */
+.hdr .ct{opacity:1}
+.ct .pn{opacity:.4}
+.ct .pn:hover{opacity:1}
+body.pinned .ct .pn{opacity:1;color:#D84315;background:rgba(216,67,21,.1)}
+body.pinned .strip{background:#FF7043}
+.nb{flex:1;display:flex;flex-direction:column;min-height:0;padding:8px 12px 0}
+#ttl{border:none;background:transparent;outline:none;font-family:inherit;font-weight:bold;font-size:calc(var(--fs) + 1px);color:#3E2723;padding:4px 2px;border-bottom:1px dashed #EADFB4}
+#ttl:focus{border-bottom-color:#FFB300}
+#body{flex:1;border:none;outline:none;resize:none;background:
+  repeating-linear-gradient(transparent,transparent calc(1.7em - 1px),#F3E9C6 calc(1.7em - 1px),#F3E9C6 1.7em);
+  font-family:inherit;font-size:var(--fs);line-height:1.7em;color:#333;padding:4px 2px;margin-top:6px;background-attachment:local}
+.ft{display:flex;align-items:center;gap:6px;padding:5px 12px 7px;font-size:calc(var(--fs) - 4px);color:#B8A66A;flex-shrink:0}
+.ft .sp{flex:1}
+.gone{flex:1;display:flex;align-items:center;justify-content:center;color:#B8A66A}
+</style>
+</head><body>
+<div class="strip"></div>
+<div class="hdr">
+ <div class="lf"><span id="hI"></span><span class="tt" id="crumb"></span></div>
+ <div class="ct">
+  <button class="pn" id="pinN" onclick="togglePin()"></button>
+  <button class="mic-btn" id="micB" onclick="startVoice(this,document.getElementById('body'))" style="padding:4px 7px"></button>
+  <button onclick="invoke('minimize_window',{label:LABEL})"><span id="_min"></span></button>
+  <button class="xb" onclick="closeMe()"><span id="_x"></span></button>
+ </div>
+</div>
+<div class="nb" id="nb">
+ <input id="ttl" placeholder="메모 제목">
+ <textarea id="body" placeholder="여기에 자세한 내용을 자유롭게 적어 두세요..."></textarea>
+</div>
+<div class="ft"><span id="pinHint"></span><span class="sp"></span><span id="saved"></span></div>
+
+<script src="common.js"></script>
+<script>
+// 창 라벨 note-{항목 id}-{메모 id} 에서 어떤 메모인지 알아낸다
+const LABEL=window.__TAURI__.window.getCurrentWindow().label;
+const [,MID,NID]=LABEL.split('-').map(Number);
+document.getElementById('hI').innerHTML=S.note;
+document.getElementById('micB').innerHTML=S.mic;
+document.getElementById('_min').innerHTML=S.min;
+document.getElementById('_x').innerHTML=S.x;
+
+let pinned=false;
+function showPin(){
+  document.body.classList.toggle('pinned',pinned);
+  const b=document.getElementById('pinN');
+  b.innerHTML=pinned?S.pin:S.unpin;
+  b.title=pinned?'고정 해제':'이 메모 창 고정';
+  document.getElementById('pinHint').textContent=pinned
+    ?'📌 고정됨 — 다시 켜도 이 자리에 떠요'
+    :'고정 안 됨 — 다른 메모를 열면 닫혀요';
+}
+async function togglePin(){flushAll();pinned=await invoke('toggle_note_pin',{memoId:MID,noteId:NID});showPin()}
+function closeMe(){flushAll();invoke('close_note_window')}
+
+function render(D){
+  const m=D.memos.find(m=>m.id===MID);
+  const n=m&&(m.notes||[]).find(n=>n.id===NID);
+  if(!n){closeMe();return} // 메모가 지워지면 창도 닫기
+  document.getElementById('crumb').textContent=m.text+' ›';
+  document.title=n.text||'상세 메모';
+  const t=document.getElementById('ttl'),b=document.getElementById('body');
+  // 입력 중인 칸은 건드리지 않음
+  if(document.activeElement!==t&&!timers.ttl&&t.value!==n.text)t.value=n.text;
+  if(document.activeElement!==b&&!timers.body&&b.value!==(n.body||''))b.value=n.body||'';
+}
+
+// 입력 후 0.5초 쉬면 저장
+const timers={};
+function schedule(kind){
+  clearTimeout(timers[kind]);
+  document.getElementById('saved').textContent='입력 중...';
+  timers[kind]=setTimeout(()=>flush(kind),500);
+}
+function flush(kind){
+  if(!timers[kind])return;
+  clearTimeout(timers[kind]);delete timers[kind];
+  if(kind==='ttl')invoke('edit_note',{memoId:MID,noteId:NID,text:document.getElementById('ttl').value});
+  else invoke('edit_note_body',{memoId:MID,noteId:NID,body:document.getElementById('body').value});
+  document.getElementById('saved').textContent='저장됨';
+}
+function flushAll(){flush('ttl');flush('body')}
+document.getElementById('ttl').addEventListener('input',()=>schedule('ttl'));
+document.getElementById('body').addEventListener('input',()=>schedule('body'));
+document.getElementById('ttl').addEventListener('blur',()=>flush('ttl'));
+document.getElementById('body').addEventListener('blur',()=>flush('body'));
+document.getElementById('ttl').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing){e.preventDefault();document.getElementById('body').focus()}});
+window.addEventListener('beforeunload',flushAll);
+
+listen('data-changed',e=>render(e.payload));
+listen('note-pins-changed',e=>{pinned=(e.payload||[]).some(p=>p.memo_id===MID&&p.note_id===NID);showPin()});
+
+(async()=>{
+  await applyFont();
+  pinned=(await invoke('get_note_pins')).some(p=>p.memo_id===MID&&p.note_id===NID);
+  showPin();
+  render(await invoke('get_all_data'));
+  const b=document.getElementById('body');
+  b.focus();b.setSelectionRange(b.value.length,b.value.length);
+})();
+</script></body></html>
