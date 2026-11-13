@@ -42,7 +42,15 @@ body{background:#FBF7EF}
 .nl::-webkit-scrollbar-thumb{background:rgba(0,0,0,.12);border-radius:3px}
 /* 메모 한 줄 — 줄 노트 느낌 */
 .ni{position:relative;display:flex;gap:6px;align-items:flex-start;padding:6px 4px 4px;border-bottom:1px dashed #E3D9CF}
-.ni .bul{color:#BCAAA4;font-size:calc(var(--fs) - 2px);line-height:1.55;padding-top:1px;user-select:none}
+.ni .bul{color:#BCAAA4;font-size:calc(var(--fs) - 2px);line-height:1.55;padding:1px 3px 0;margin-left:-3px;user-select:none;cursor:grab;border-radius:3px;width:1.3em;flex-shrink:0;box-sizing:border-box;text-align:center;touch-action:none}
+/* 앞의 점(•)을 잡고 끌면 순서 바꾸기 — 마우스를 올리면 손잡이(⠿)로 바뀜 */
+.ni .bul::before{content:'•'}
+.ni .bul:hover{background:rgba(0,0,0,.06);color:#8D6E63}
+.ni .bul:hover::before{content:'⠿'}
+.ni.drag{background:#FFF8E7;box-shadow:0 3px 10px rgba(0,0,0,.15);z-index:2;border-radius:4px;border-bottom-color:transparent}
+.ni.drag .bul{cursor:grabbing;color:#8D6E63}
+.ni.drag .bul::before{content:'⠿'}
+.nl.dragging,.nl.dragging *{cursor:grabbing!important;user-select:none}
 .ni textarea{flex:1;border:none;background:transparent;resize:none;outline:none;font-family:inherit;font-size:var(--fs);line-height:1.55;color:#333;overflow:hidden;min-height:1.55em;padding:0}
 .ni textarea:focus{background:rgba(255,255,255,.7);box-shadow:0 0 0 3px rgba(255,255,255,.7);border-radius:2px}
 .ni .nt{font-size:calc(var(--fs) - 5px);color:#C0B4AC;white-space:nowrap;padding-top:3px}
@@ -174,6 +182,47 @@ function renderTabs(){
   });
 })();
 
+// ── 상세 메모 끌어서 순서 바꾸기 (앞의 점을 잡고 위아래로) ──
+(function(){
+  const nb=document.getElementById('nb');
+  nb.addEventListener('pointerdown',e=>{
+    const bul=e.target.closest('.ni .bul');
+    if(!bul||e.button!==0)return;
+    e.preventDefault();
+    const row=bul.closest('.ni'),list=row.parentElement,mid=active,y0=e.clientY;
+    let dragging=false;
+    const move=ev=>{
+      if(!dragging){
+        if(Math.abs(ev.clientY-y0)<4)return;
+        dragging=true;flushAll();
+        row.classList.add('drag');list.classList.add('dragging');
+        try{bul.setPointerCapture(e.pointerId)}catch(_){}
+      }
+      // 마우스 위치에 맞춰 자리 바꾸기
+      const others=[...list.querySelectorAll('.ni')].filter(r=>r!==row);
+      let before=null;
+      for(const o of others){const r=o.getBoundingClientRect();if(ev.clientY<r.top+r.height/2){before=o;break}}
+      if(before){if(row.nextElementSibling!==before)list.insertBefore(row,before)}
+      else{const last=others[others.length-1];if(last&&last.nextElementSibling!==row)list.insertBefore(row,last.nextElementSibling)}
+      // 목록 끝에 가까우면 자동 스크롤
+      const lr=list.getBoundingClientRect();
+      if(ev.clientY<lr.top+24)list.scrollTop-=8;else if(ev.clientY>lr.bottom-24)list.scrollTop+=8;
+    };
+    const up=()=>{
+      document.removeEventListener('pointermove',move);
+      document.removeEventListener('pointerup',up);
+      document.removeEventListener('pointercancel',up);
+      if(!dragging)return;
+      row.classList.remove('drag');list.classList.remove('dragging');
+      const order=[...list.querySelectorAll('.ni')].map(r=>+r.dataset.nid);
+      if(mid===active)invoke('reorder_notes',{memoId:mid,order});
+    };
+    document.addEventListener('pointermove',move);
+    document.addEventListener('pointerup',up);
+    document.addEventListener('pointercancel',up);
+  });
+})();
+
 let shownKey='';
 function render(force){
   if(!D)return;
@@ -215,8 +264,8 @@ function render(force){
       <div class="mi">${chips(m)}</div>
       ${m.description?`<div class="md">${esc(m.description)}</div>`:''}
     </div>
-    <div class="nl" id="nl">${notes.length?notes.map(n=>`<div class="ni">
-        <span class="bul">•</span>
+    <div class="nl" id="nl">${notes.length?notes.map(n=>`<div class="ni" data-nid="${n.id}">
+        <span class="bul" title="끌어서 순서 바꾸기"></span>
         <textarea rows="1" data-nid="${n.id}" oninput="onEdit(this)" onblur="flush(${n.id})">${esc(n.text)}</textarea>
         <span class="nflag">${n.body?`<span title="본문 있음">${S.note}</span>`:''}${isNotePinned(m.id,n.id)?`<span class="pf" title="고정된 메모 창">${S.pin}</span>`:''}</span>
         <span class="nt">${esc((n.created||'').slice(5))}</span>

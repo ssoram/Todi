@@ -371,6 +371,20 @@ fn delete_note(app: AppHandle, store: State<Store>, memo_id: u64, note_id: u64) 
     emit_refresh(&app, &store);
 }
 
+/// 메모장에서 상세 메모 줄을 끌어서 순서를 바꿨을 때: order는 메모 id를 새 순서대로 나열한 것
+#[tauri::command]
+fn reorder_notes(app: AppHandle, store: State<Store>, memo_id: u64, order: Vec<u64>) {
+    let mut d = store.data.lock().unwrap();
+    let Some(m) = d.memos.iter_mut().find(|m| m.id == memo_id) else { return };
+    let before: Vec<u64> = m.notes.iter().map(|n| n.id).collect();
+    // order에 없는 메모(그 사이 추가된 것 등)는 원래 순서대로 맨 뒤에 남긴다
+    let pos = |id: u64| order.iter().position(|&o| o == id).unwrap_or(usize::MAX);
+    m.notes.sort_by_key(|n| pos(n.id));
+    if m.notes.iter().map(|n| n.id).eq(before.into_iter()) { return; }
+    drop(d);
+    emit_refresh(&app, &store);
+}
+
 /// 목록에서 항목을 눌렀을 때: 메모장 창을 띄우고 해당 항목 탭을 연다
 #[tauri::command]
 fn open_note(app: AppHandle, store: State<Store>, id: u64) {
@@ -1021,7 +1035,7 @@ pub fn run() {
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity, save_calendar_color,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
             fit_window_height,
-            add_note, edit_note, delete_note, open_note, take_pending_note,
+            add_note, edit_note, delete_note, reorder_notes, open_note, take_pending_note,
             get_guide_state, dismiss_guide, open_guide,
             edit_note_body, open_note_window, close_unpinned_note_windows, get_note_pins, toggle_note_pin, close_note_window,
         ])
