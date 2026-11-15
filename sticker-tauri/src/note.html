@@ -66,6 +66,8 @@ function closeMe(){flushAll();invoke('close_note_window')}
 function render(D){
   const m=D.memos.find(m=>m.id===MID);
   const n=m&&(m.notes||[]).find(n=>n.id===NID);
+  // 잠금으로 숨겨진 항목이면 고정은 그대로 두고 창만 닫기 (잠금을 풀면 다시 뜸)
+  if(!m&&(D.hidden_ids||[]).includes(MID)){flushAll();window.__TAURI__.window.getCurrentWindow().close();return}
   if(!n){closeMe();return} // 메모가 지워지면 창도 닫기
   document.getElementById('crumb').textContent=m.text+' ›';
   document.title=n.text||'상세 메모';

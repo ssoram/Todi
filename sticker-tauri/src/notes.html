@@ -111,6 +111,9 @@ function saveTabs(){try{localStorage.setItem(LS_KEY,JSON.stringify({tabs,active}
 function sortPinned(){tabs=[...tabs.filter(t=>t.pinned),...tabs.filter(t=>!t.pinned)]}
 
 const memoOf=id=>D?D.memos.find(m=>m.id===id):null;
+// 잠금으로 숨겨진 항목의 탭은 지우지 않고 감춰 두었다가, 잠금을 풀면 다시 보여 준다
+const isHidden=id=>!!D&&(D.hidden_ids||[]).includes(id);
+const visTabs=()=>tabs.filter(t=>!isHidden(t.id));
 
 // ── 탭 동작 ──
 function openMemo(id){
@@ -126,16 +129,17 @@ function closeTab(id){
   flushAll();
   const i=tabs.findIndex(t=>t.id===id);if(i<0)return;
   tabs.splice(i,1);
-  if(active===id){const n=tabs[i]||tabs[i-1];active=n?n.id:null}
+  if(active===id){const v=visTabs(),n=v[i]||v[v.length-1];active=n?n.id:null}
   saveTabs();render(true);
 }
 
 // ── 그리기 ──
 function renderTabs(){
   const el=document.getElementById('tabs');
-  if(!tabs.length){el.style.display='none';return}
+  const vt=visTabs();
+  if(!vt.length){el.style.display='none';return}
   el.style.display='flex';
-  el.innerHTML=tabs.map(t=>{
+  el.innerHTML=vt.map(t=>{
     const m=memoOf(t.id);const title=m?m.text:'(삭제된 항목)';
     return `<div class="tab${t.id===active?' on':''}${t.pinned?' pinned':''}" data-id="${t.id}" title="${esc(title)}${t.pinned?' (고정됨 — 고정을 풀어야 닫을 수 있어요)':''}">
       <span class="tl">${esc(title)}</span>
@@ -174,7 +178,8 @@ function renderTabs(){
       if(!dragging){clickTab(id);return}
       tab.classList.remove('drag');bar.classList.remove('dragging');
       const order=[...bar.querySelectorAll('.tab')].map(t=>+t.dataset.id);
-      tabs.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
+      const pos=id=>{const i=order.indexOf(id);return i<0?1e9:i};
+      tabs.sort((a,b)=>pos(a.id)-pos(b.id));
       sortPinned();saveTabs();renderTabs();
     };
     document.addEventListener('pointermove',move);
@@ -228,8 +233,8 @@ function render(force){
   if(!D)return;
   // 삭제(영구삭제)된 항목의 탭은 정리
   const before=tabs.length;
-  tabs=tabs.filter(t=>memoOf(t.id));
-  if(active!==null&&!memoOf(active))active=(tabs[0]||{}).id??null;
+  tabs=tabs.filter(t=>memoOf(t.id)||isHidden(t.id));
+  if(active!==null&&!memoOf(active))active=(visTabs()[0]||{}).id??null;
   if(tabs.length!==before)saveTabs();
   renderTabs();
   const nb=document.getElementById('nb');

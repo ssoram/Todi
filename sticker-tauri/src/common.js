@@ -21,11 +21,20 @@ micOn:'<svg viewBox="0 0 24 24" width="14" height="14" fill="red" stroke="red" s
 note:'<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9z"/><path d="M14 3v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>',
 open:'<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><line x1="20" y1="4" x2="11" y2="13"/><path d="M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>',
 help:'<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 015 .5c0 1.7-2.5 2-2.5 3.5"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>',
+lock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>',
+unlock:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 017.5-2"/></svg>',
 };
 
 // ═══ Tauri API ═══
 const {invoke} = window.__TAURI__.core;
 const {listen} = window.__TAURI__.event;
+
+// 잠금의 "한동안 손대지 않으면 다시 잠금"을 위해, 창을 쓰고 있다는 걸 가끔 알려 준다
+let _lastTouch=0;
+['pointerdown','keydown'].forEach(ev=>document.addEventListener(ev,()=>{
+  const n=Date.now();
+  if(n-_lastTouch>20000){_lastTouch=n;invoke('lock_touch').catch(()=>{})}
+},true));
 
 function esc(t){const d=document.createElement('div');d.textContent=t||'';return d.innerHTML}
 
@@ -77,18 +86,19 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 // ═══ 커스텀 확인 팝업 ═══
-function customConfirm(msg){
+// ok: 확인 버튼 글자 (지우는 게 아닌 확인이면 넣는다. 이때는 휴지통 아이콘을 빼고 보여 줌)
+function customConfirm(msg,ok){
   return new Promise(resolve=>{
     // 기존 팝업 제거
     const old=document.getElementById('_cf');if(old)old.remove();
     const ov=document.createElement('div');
     ov.id='_cf';ov.className='confirm-overlay show';
     ov.innerHTML=`<div class="confirm-box">
-      <div class="ci">${S.trash}</div>
+      ${ok?'':`<div class="ci">${S.trash}</div>`}
       <div class="cm">${esc(msg)}</div>
       <div class="cb">
         <button class="btn-cancel" id="_cfN">취소</button>
-        <button class="btn-ok" id="_cfY">삭제</button>
+        <button class="btn-ok" id="_cfY">${esc(ok||'삭제')}</button>
       </div></div>`;
     document.body.appendChild(ov);
     document.getElementById('_cfY').onclick=()=>{ov.remove();resolve(true)};

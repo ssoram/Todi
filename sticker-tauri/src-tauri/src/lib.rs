@@ -2,12 +2,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use chrono::Local;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt as AutostartManagerExt};
 use tauri_plugin_updater::UpdaterExt;
+
+mod crypto;
+mod lock;
+mod sync;
 
 // ════════ 데이터 타입 ════════
 
@@ -44,6 +49,15 @@ struct Memo {
     end_date: Option<String>,
     #[serde(default)]
     notes: Vec<Note>,
+    /// 기기를 넘나들어도 같은 항목을 가리키는 고유 ID (동기화용)
+    #[serde(default)]
+    uid: String,
+    /// 마지막으로 내용이 바뀐 시각 (밀리초). 동기화할 때 더 최근 것을 남긴다.
+    #[serde(default)]
+    updated: i64,
+    /// 내용 지문 — 이게 달라지면 updated를 새로 찍는다 (stamp 참고)
+    #[serde(default)]
+    hash: u64,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -52,6 +66,18 @@ struct AppData {
     memos: Vec<Memo>,
     #[serde(default)]
     collapsed: HashMap<String, bool>,
+    /// 완전히 지운 항목 uid → 지운 시각. 다른 기기에서도 지워지도록 남겨 둔다.
+    #[serde(default)]
+    deleted: HashMap<String, i64>,
+    /// 잠근 카테고리의 암호화된 내용 (잠겨 있을 때만)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    vault: Option<String>,
+    /// 잠긴 항목들 중 가장 큰 id — 잠긴 동안 새 항목이 같은 id를 쓰지 않도록
+    #[serde(default)]
+    hidden_max_id: u64,
+    /// 잠긴 항목의 id — 메모장 탭·고정 메모 창이 "지워진 것"으로 오해해 정리하지 않도록
+    #[serde(default)]
+    hidden_ids: Vec<u64>,
 }
 
 impl Default for AppData {
@@ -60,6 +86,10 @@ impl Default for AppData {
             categories: vec!["일반".into(), "개발".into(), "회의".into(), "기타".into()],
             memos: vec![],
             collapsed: HashMap::new(),
+            deleted: HashMap::new(),
+            vault: None,
+            hidden_max_id: 0,
+            hidden_ids: vec![],
         }
     }
 }
@@ -113,6 +143,29 @@ struct Settings {
     seen_version: String,
     #[serde(default)]
     pinned_notes: Vec<NoteWin>,
+    // ── 자동 동기화 ──
+    #[serde(default)]
+    device_id: String,
+    /// 같은 코드를 넣은 기기끼리 동기화된다. 빈 값 = 동기화 안 함
+    #[serde(default)]
+    sync_code: String,
+    #[serde(default)]
+    sync_cats: Vec<String>,
+    /// 체크를 끈 카테고리 — 상대가 보내도 받지 않는다
+    #[serde(default)]
+    sync_off: Vec<String>,
+    #[serde(default)]
+    sync_lan: bool,
+    /// 직접 넣은 상대 주소 (신호가 닿지 않는 네트워크용)
+    #[serde(default)]
+    sync_peer: String,
+    #[serde(default)]
+    sync_folder: String,
+    #[serde(default)]
+    sync_folder_on: bool,
+    /// 잠금 (카테고리 숨기기) 설정. None = 사용 안 함
+    #[serde(default)]
+    lock: Option<lock::LockCfg>,
 }
 
 impl Default for Settings {
@@ -135,6 +188,15 @@ impl Default for Settings {
             notes: default_notes_geo(),
             seen_version: String::new(),
             pinned_notes: vec![],
+            device_id: String::new(),
+            sync_code: String::new(),
+            sync_cats: vec![],
+            sync_off: vec![],
+            sync_lan: false,
+            sync_peer: String::new(),
+            sync_folder: String::new(),
+            sync_folder_on: false,
+            lock: None,
         }
     }
 }
@@ -150,6 +212,12 @@ struct Store {
     fresh_install: bool,
     /// 메모장 창이 아직 로드되지 않았을 때 열어야 할 항목 id
     pending_note: Mutex<Option<u64>>,
+    /// 이 기기의 고유 ID (uid 만들 때 사용)
+    device: String,
+    /// 잠금이 풀려 있는 동안의 데이터 키 (잠겨 있으면 None)
+    lock_key: Mutex<Option<[u8; 32]>>,
+    /// 마지막으로 창을 만진 시각 (자동 다시 잠금용)
+    last_active: Mutex<Instant>,
 }
 
 impl Store {
@@ -162,28 +230,48 @@ impl Store {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
         // 예전 버전 데이터에는 id가 없으므로 여기서 부여
-        let mut next = data.memos.iter().map(|m| m.id).max().unwrap_or(0);
+        let mut next = max_id(&data);
         for m in data.memos.iter_mut().filter(|m| m.id == 0) {
             next += 1;
             m.id = next;
         }
-        let settings: Settings = fs::read_to_string(&sp)
+        let mut settings: Settings = fs::read_to_string(&sp)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
-        Self {
+        let new_device = settings.device_id.is_empty();
+        if new_device {
+            settings.device_id = random_hex(8);
+        }
+        let device = settings.device_id.clone();
+        // 예전 버전 데이터에는 uid/수정 시각이 없으므로 여기서 부여
+        stamp(&mut data, &device);
+        let lock_key = lock::on_load(&mut data, &mut settings);
+        let store = Self {
             data: Mutex::new(data),
             settings: Mutex::new(settings),
             data_path: dp,
             settings_path: sp,
             fresh_install,
             pending_note: Mutex::new(None),
+            device,
+            lock_key: Mutex::new(lock_key),
+            last_active: Mutex::new(Instant::now()),
+        };
+        if new_device {
+            store.save_settings();
         }
+        if !fresh_install {
+            store.save_data();
+        }
+        store
     }
 
     fn save_data(&self) {
         if let Ok(d) = self.data.lock() {
-            if let Ok(j) = serde_json::to_string_pretty(&*d) {
+            // 잠금을 쓰면 잠근 카테고리는 암호화해서 쓴다
+            let out = lock::for_disk(&d, &self.settings.lock().unwrap(), *self.lock_key.lock().unwrap());
+            if let Ok(j) = serde_json::to_string_pretty(&out) {
                 let _ = fs::write(&self.data_path, j);
             }
         }
@@ -191,16 +279,75 @@ impl Store {
 
     fn save_settings(&self) {
         if let Ok(s) = self.settings.lock() {
-            if let Ok(j) = serde_json::to_string_pretty(&*s) {
+            if let Ok(j) = serde_json::to_string_pretty(&lock::settings_for_disk(&s)) {
                 let _ = fs::write(&self.settings_path, j);
             }
         }
     }
 }
 
+// ════════ 동기화용 기록 (uid · 수정 시각 · 삭제 기록) ════════
+
+/// 새 항목에 쓸 id의 기준 (잠긴 항목의 id까지 고려)
+fn max_id(d: &AppData) -> u64 {
+    d.memos.iter().map(|m| m.id).max().unwrap_or(0).max(d.hidden_max_id)
+}
+
+fn now_ms() -> i64 {
+    Local::now().timestamp_millis()
+}
+
+fn random_hex(bytes: usize) -> String {
+    let mut b = vec![0u8; bytes];
+    let _ = getrandom::getrandom(&mut b);
+    b.iter().map(|x| format!("{x:02x}")).collect()
+}
+
+/// 항목 내용의 지문 (FNV-1a). 앱 버전이 바뀌어도 값이 같아야 하므로 직접 구현.
+fn memo_hash(m: &Memo) -> u64 {
+    let mut c = m.clone();
+    c.id = 0;
+    c.updated = 0;
+    c.hash = 0;
+    let json = serde_json::to_vec(&c).unwrap_or_default();
+    json.iter().fold(0xcbf29ce484222325u64, |h, &b| (h ^ b as u64).wrapping_mul(0x100000001b3))
+}
+
+/// 삭제 기록은 이 기간이 지나면 정리한다
+const TOMBSTONE_KEEP_MS: i64 = 90 * 24 * 60 * 60 * 1000;
+
+/// 내용이 바뀐 항목에 수정 시각을 찍고, uid가 없는 항목에는 uid를 붙인다.
+/// 모든 변경은 emit_refresh를 거치므로 명령마다 따로 챙길 필요가 없다.
+fn stamp(d: &mut AppData, device: &str) {
+    let now = now_ms();
+    for m in d.memos.iter_mut() {
+        if m.uid.is_empty() {
+            m.uid = format!("{device}-{}-{}", random_hex(4), m.id);
+        }
+        let h = memo_hash(m);
+        if h != m.hash {
+            m.hash = h;
+            m.updated = now;
+        }
+    }
+    d.deleted.retain(|_, t| now - *t < TOMBSTONE_KEEP_MS);
+}
+
+fn tombstone(d: &mut AppData, uid: &str) {
+    if !uid.is_empty() {
+        d.deleted.insert(uid.to_string(), now_ms());
+    }
+}
+
 /// 데이터 변경 후 모든 창에 이벤트 전송 + 파일 저장
 fn emit_refresh(app: &AppHandle, store: &State<Store>) {
+    if let Ok(mut d) = store.data.lock() {
+        stamp(&mut d, &store.device);
+    }
     store.save_data();
+    if let Some(rt) = app.try_state::<sync::SyncRt>() {
+        rt.bump();
+    }
     if let Ok(d) = store.data.lock() {
         let _ = app.emit("data-changed", &*d);
     }
@@ -227,11 +374,11 @@ fn get_settings(store: State<Store>) -> Settings {
 fn add_memo(app: AppHandle, store: State<Store>, text: String, desc: String, category: String, status: String, due_date: Option<String>, end_date: Option<String>) {
     let end_date = end_date.filter(|s| !s.is_empty());
     let mut d = store.data.lock().unwrap();
-    let id = d.memos.iter().map(|m| m.id).max().unwrap_or(0) + 1;
+    let id = max_id(&d) + 1;
     d.memos.push(Memo {
         id, text, description: desc, category, status,
         done: false, done_at: None, prev_status: None, due_date, end_date,
-        notes: vec![],
+        notes: vec![], uid: String::new(), updated: 0, hash: 0,
     });
     drop(d);
     emit_refresh(&app, &store);
@@ -303,7 +450,10 @@ fn delete_memo(app: AppHandle, store: State<Store>, idx: usize) {
 #[tauri::command]
 fn permanent_delete(app: AppHandle, store: State<Store>, idx: usize) {
     let mut d = store.data.lock().unwrap();
-    if idx < d.memos.len() { d.memos.remove(idx); }
+    if idx < d.memos.len() {
+        let m = d.memos.remove(idx);
+        tombstone(&mut d, &m.uid);
+    }
     drop(d);
     emit_refresh(&app, &store);
 }
@@ -311,7 +461,9 @@ fn permanent_delete(app: AppHandle, store: State<Store>, idx: usize) {
 #[tauri::command]
 fn empty_trash(app: AppHandle, store: State<Store>) {
     let mut d = store.data.lock().unwrap();
+    let gone: Vec<String> = d.memos.iter().filter(|m| m.status == "trash").map(|m| m.uid.clone()).collect();
     d.memos.retain(|m| m.status != "trash");
+    for u in gone { tombstone(&mut d, &u); }
     drop(d);
     emit_refresh(&app, &store);
 }
@@ -588,7 +740,7 @@ fn show_full_guide(app: &AppHandle) {
 #[tauri::command]
 fn add_category(app: AppHandle, store: State<Store>, name: String) -> bool {
     let name = name.trim().to_string();
-    if name.is_empty() { return false; }
+    if name.is_empty() || lock::is_hidden(&store, &name) { return false; }
     let mut d = store.data.lock().unwrap();
     if d.categories.contains(&name) { return false; }
     d.categories.push(name);
@@ -607,12 +759,20 @@ fn delete_category(app: AppHandle, store: State<Store>, name: String) {
         if m.category == name { m.category = fb.clone(); }
     }
     drop(d);
+    let mut s = store.settings.lock().unwrap();
+    if s.sync_cats.contains(&name) || s.sync_off.contains(&name) {
+        s.sync_cats.retain(|c| c != &name);
+        s.sync_off.retain(|c| c != &name);
+        drop(s);
+        store.save_settings();
+    }
     emit_refresh(&app, &store);
 }
 
 #[tauri::command]
 fn rename_category(app: AppHandle, store: State<Store>, old: String, new_name: String) {
     let nn = new_name.trim().to_string();
+    if lock::is_hidden(&store, &nn) { return; }
     let mut d = store.data.lock().unwrap();
     if nn.is_empty() || !d.categories.contains(&old) || d.categories.contains(&nn) { return; }
     if let Some(pos) = d.categories.iter().position(|c| c == &old) {
@@ -629,6 +789,20 @@ fn rename_category(app: AppHandle, store: State<Store>, old: String, new_name: S
         d.collapsed.insert(k.replace(&format!(":{old}"), &format!(":{nn}")), v);
     }
     drop(d);
+    // 동기화 중인 카테고리면 새 이름으로 계속 동기화
+    let mut guard = store.settings.lock().unwrap();
+    let s = &mut *guard;
+    let mut renamed = false;
+    for c in s.sync_cats.iter_mut().chain(s.sync_off.iter_mut()) {
+        if *c == old {
+            *c = nn.clone();
+            renamed = true;
+        }
+    }
+    if renamed {
+        drop(guard);
+        store.save_settings();
+    }
     emit_refresh(&app, &store);
 }
 
@@ -647,6 +821,149 @@ fn move_category(app: AppHandle, store: State<Store>, name: String, direction: S
     }
     drop(d);
     emit_refresh(&app, &store);
+}
+
+// ════════ 데이터 옮기기 (다른 컴퓨터로 내보내기 / 가져오기) ════════
+
+/// 내보낸 파일 형식
+#[derive(Serialize, Deserialize, Clone, Debug)]
+struct ExportFile {
+    #[serde(default)]
+    app: String,
+    #[serde(default)]
+    version: String,
+    #[serde(default)]
+    exported: String,
+    categories: Vec<String>,
+    memos: Vec<Memo>,
+}
+
+#[derive(Serialize)]
+struct ImportResult {
+    added: usize,
+    skipped: usize,
+    removed: usize,
+}
+
+/// 고른 카테고리의 항목(휴지통 제외)을 파일로 저장. 취소하면 None.
+#[tauri::command]
+async fn export_data(app: AppHandle, store: State<'_, Store>, categories: Vec<String>) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let file = {
+        let d = store.data.lock().unwrap();
+        ExportFile {
+            app: "Todi".into(),
+            version: app.package_info().version.to_string(),
+            exported: Local::now().format("%Y-%m-%d %H:%M").to_string(),
+            // 순서는 이 컴퓨터의 카테고리 순서대로
+            categories: d.categories.iter().filter(|c| categories.contains(c)).cloned().collect(),
+            memos: d.memos.iter()
+                .filter(|m| m.status != "trash" && categories.contains(&m.category))
+                .cloned().collect(),
+        }
+    };
+    let name = format!("Todi-{}.json", Local::now().format("%Y%m%d"));
+    let Some(path) = app.dialog().file()
+        .set_title("Todi 데이터 내보내기")
+        .add_filter("Todi 데이터", &["json"])
+        .set_file_name(&name)
+        .blocking_save_file() else { return Ok(None) };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    let json = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
+    fs::write(&path, json).map_err(|e| format!("파일을 저장하지 못했어요: {e}"))?;
+    Ok(Some(path.display().to_string()))
+}
+
+/// 가져올 파일을 골라서 내용을 돌려준다 (실제 반영은 import_data). 취소하면 None.
+#[tauri::command]
+async fn open_import_file(app: AppHandle) -> Result<Option<ExportFile>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let Some(path) = app.dialog().file()
+        .set_title("Todi 데이터 불러오기")
+        .add_filter("Todi 데이터", &["json"])
+        .blocking_pick_file() else { return Ok(None) };
+    let path = path.into_path().map_err(|e| e.to_string())?;
+    let text = fs::read_to_string(&path).map_err(|e| format!("파일을 열지 못했어요: {e}"))?;
+    // 내보낸 파일뿐 아니라 memos.json(전체 데이터 파일)을 직접 골라도 읽을 수 있다
+    serde_json::from_str::<ExportFile>(&text)
+        .map(Some)
+        .map_err(|_| "Todi 데이터 파일이 아니에요.".to_string())
+}
+
+/// mode: "merge" = 기존 항목은 두고 없는 항목만 추가, "replace" = 고른 카테고리의 기존 항목을 파일 내용으로 교체
+#[tauri::command]
+fn import_data(app: AppHandle, store: State<Store>, file: ExportFile, categories: Vec<String>, mode: String) -> ImportResult {
+    let replace = mode == "replace";
+    // 잠겨 있는 카테고리에는 지금 넣을 수 없음 (잠긴 내용과 섞이지 않도록)
+    let categories: Vec<String> = categories.into_iter().filter(|c| !lock::is_hidden(&store, c)).collect();
+    let res = import_into(&mut store.data.lock().unwrap(), file, &categories, replace);
+    emit_refresh(&app, &store);
+    res
+}
+
+/// 불러오기의 실제 반영 (화면·저장과 떼어 놓아 테스트할 수 있게)
+fn import_into(d: &mut AppData, file: ExportFile, categories: &[String], replace: bool) -> ImportResult {
+    let mut res = ImportResult { added: 0, skipped: 0, removed: 0 };
+    let mut reuse: HashMap<String, u64> = HashMap::new();
+    for c in file.categories.iter().filter(|c| categories.contains(c)) {
+        if !d.categories.contains(c) {
+            d.categories.push(c.clone());
+        }
+    }
+    let incoming: Vec<Memo> = file.memos.into_iter()
+        .filter(|m| m.status != "trash" && categories.contains(&m.category)).collect();
+    if replace {
+        let keep: std::collections::HashSet<String> = incoming.iter()
+            .map(|m| m.uid.clone()).filter(|u| !u.is_empty()).collect();
+        let (gone, kept): (Vec<Memo>, Vec<Memo>) = std::mem::take(&mut d.memos).into_iter()
+            .partition(|m| m.status != "trash" && categories.contains(&m.category));
+        d.memos = kept;
+        // 같은 항목을 다시 넣을 때는 이 컴퓨터의 id를 그대로 써서, 메모장 탭·고정 메모 창이 유지되게
+        for m in &gone {
+            if keep.contains(&m.uid) { reuse.insert(m.uid.clone(), m.id); }
+        }
+        res.removed = gone.len();
+        // 지운 항목은 다른 기기에서도 지워지도록 삭제 기록 (같은 항목을 다시 넣는 경우는 제외)
+        for m in &gone {
+            if !keep.contains(&m.uid) { tombstone(d, &m.uid); }
+        }
+        // 휴지통에 같은 항목이 있으면 겹치지 않게 정리
+        d.memos.retain(|m| !keep.contains(&m.uid));
+    }
+    let same = |a: &Memo, b: &Memo| a.category == b.category && a.text == b.text
+        && a.description == b.description && a.due_date == b.due_date && a.end_date == b.end_date;
+    let mut next = max_id(d);
+    for m in incoming {
+        if !replace {
+            // 같은 항목(uid)이 이미 있으면 더 최근 것으로 맞추고, 내용이 같은 항목은 건너뜀
+            if let Some(x) = d.memos.iter_mut().find(|x| !m.uid.is_empty() && x.uid == m.uid) {
+                if m.updated > x.updated {
+                    let id = x.id;
+                    *x = Memo { id, ..m };
+                    x.hash = memo_hash(x);
+                    res.added += 1;
+                } else {
+                    res.skipped += 1;
+                }
+                continue;
+            }
+            if d.memos.iter().any(|x| x.status != "trash" && same(x, &m)) {
+                res.skipped += 1;
+                continue;
+            }
+        }
+        let id = match reuse.get(&m.uid) {
+            Some(&id) => id,
+            None => { next += 1; next }
+        };
+        let mut m = Memo { id, ..m };
+        m.hash = memo_hash(&m);
+        d.memos.push(m);
+        res.added += 1;
+    }
+    let live: std::collections::HashSet<String> = d.memos.iter().map(|m| m.uid.clone()).collect();
+    d.deleted.retain(|u, _| !live.contains(u));
+    res
 }
 
 // ════════ 설정 명령 ════════
@@ -887,16 +1204,23 @@ fn close_app(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .setup(|app| {
             // 데이터 디렉토리
             let data_dir = app.path().app_data_dir()?;
+            // 개발용 빌드에서만: 실제 데이터를 건드리지 않고 시험할 수 있게 다른 폴더를 쓸 수 있다
+            #[cfg(debug_assertions)]
+            let data_dir = std::env::var_os("TODI_DATA_DIR").map(std::path::PathBuf::from).unwrap_or(data_dir);
             fs::create_dir_all(&data_dir)?;
 
             let store = Store::new(data_dir);
             let settings = store.settings.lock().unwrap().clone();
             app.manage(store);
+            app.manage(sync::SyncRt::new());
+            sync::start(app.handle().clone());
+            lock::start_idle_watch(app.handle().clone());
 
             // 창 생성: (label, html, geo, visible)
             let wins: Vec<(&str, &str, &WinGeo, bool)> = vec![
@@ -1035,10 +1359,161 @@ pub fn run() {
             save_user_settings, get_system_fonts, set_autostart, set_close_to_tray, set_opacity, save_calendar_color,
             start_drag, show_window, hide_window, minimize_window, toggle_on_top, close_app, close_window,
             fit_window_height,
+            export_data, open_import_file, import_data,
+            sync::get_sync_status, sync::sync_new_code, sync::sync_set_code, sync::sync_clear,
+            sync::sync_set_cats, sync::sync_set_lan, sync::sync_pick_folder, sync::sync_set_folder_on, sync::sync_now, sync::sync_set_peer,
+            lock::lock_status, lock::lock_setup, lock::lock_now, lock::lock_unlock, lock::lock_recover,
+            lock::lock_change_password, lock::lock_set_cats, lock::lock_set_mode, lock::lock_disable, lock::lock_touch,
             add_note, edit_note, delete_note, reorder_notes, open_note, take_pending_note,
             get_guide_state, dismiss_guide, open_guide,
             edit_note_body, open_note_window, close_unpinned_note_windows, get_note_pins, toggle_note_pin, close_note_window,
         ])
         .run(tauri::generate_context!())
         .expect("앱 실행 오류");
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    fn memo(id: u64, uid: &str, cat: &str, text: &str, updated: i64) -> Memo {
+        let mut m: Memo = serde_json::from_value(serde_json::json!({
+            "text": text, "category": cat, "status": "todo", "done_at": null,
+        })).unwrap();
+        m.id = id;
+        m.uid = uid.into();
+        m.updated = updated;
+        m
+    }
+
+    fn data(cats: &[&str], memos: Vec<Memo>) -> AppData {
+        AppData { categories: cats.iter().map(|c| c.to_string()).collect(), memos, ..AppData::default() }
+    }
+
+    /// export_data와 같은 방식으로 파일 내용을 만들고, JSON을 거쳐 다시 읽는다
+    fn export(d: &AppData, cats: &[&str]) -> ExportFile {
+        let cats: Vec<String> = cats.iter().map(|c| c.to_string()).collect();
+        let f = ExportFile {
+            app: "Todi".into(), version: "test".into(), exported: String::new(),
+            categories: d.categories.iter().filter(|c| cats.contains(c)).cloned().collect(),
+            memos: d.memos.iter().filter(|m| m.status != "trash" && cats.contains(&m.category)).cloned().collect(),
+        };
+        serde_json::from_str(&serde_json::to_string_pretty(&f).unwrap()).unwrap()
+    }
+
+    fn cats(v: &[&str]) -> Vec<String> {
+        v.iter().map(|c| c.to_string()).collect()
+    }
+
+    fn laptop() -> AppData {
+        let mut trash = memo(4, "L4", "업무", "버린것", 100);
+        trash.status = "trash".into();
+        data(&["업무", "개인", "회의"], vec![
+            memo(1, "L1", "업무", "보고서", 100),
+            memo(2, "L2", "개인", "운동", 100),
+            memo(3, "L3", "회의", "회의록", 100),
+            trash,
+        ])
+    }
+
+    #[test]
+    fn export_then_merge_into_other_pc() {
+        let f = export(&laptop(), &["업무", "개인"]);
+        assert_eq!(f.categories, vec!["업무", "개인"]);
+        assert_eq!(f.memos.len(), 2, "휴지통·안 고른 카테고리는 빠져야 함");
+
+        let mut pc = data(&["일반"], vec![memo(1, "P1", "일반", "기존", 50)]);
+        let r = import_into(&mut pc, f.clone(), &cats(&["업무", "개인"]), false);
+        assert_eq!((r.added, r.skipped, r.removed), (2, 0, 0));
+        assert_eq!(pc.categories, vec!["일반", "업무", "개인"]);
+        assert_eq!(pc.memos.len(), 3);
+        assert!(pc.memos.iter().any(|m| m.uid == "L1"), "uid 유지");
+        let ids: Vec<u64> = pc.memos.iter().map(|m| m.id).collect();
+        assert_eq!(ids, vec![1, 2, 3], "id 겹치면 안 됨");
+
+        // 같은 파일을 한 번 더 → 전부 건너뜀
+        let r = import_into(&mut pc, f, &cats(&["업무", "개인"]), false);
+        assert_eq!((r.added, r.skipped), (0, 2));
+        assert_eq!(pc.memos.len(), 3);
+    }
+
+    #[test]
+    fn only_checked_categories_are_imported() {
+        let f = export(&laptop(), &["업무", "개인", "회의"]);
+        let mut pc = data(&["일반"], vec![]);
+        let r = import_into(&mut pc, f, &cats(&["회의"]), false);
+        assert_eq!(r.added, 1);
+        assert_eq!(pc.categories, vec!["일반", "회의"]);
+        assert_eq!(pc.memos[0].text, "회의록");
+    }
+
+    #[test]
+    fn merge_keeps_newer_version() {
+        let mut lap = laptop();
+        let f_old = export(&lap, &["업무"]);
+        let mut pc = data(&["업무"], vec![]);
+        import_into(&mut pc, f_old.clone(), &cats(&["업무"]), false);
+        let pc_id = pc.memos[0].id;
+
+        // 노트북에서 고친 뒤 다시 옮김 → 고친 내용으로
+        lap.memos[0].text = "보고서 v2".into();
+        lap.memos[0].updated = 200;
+        import_into(&mut pc, export(&lap, &["업무"]), &cats(&["업무"]), false);
+        assert_eq!(pc.memos.len(), 1);
+        assert_eq!(pc.memos[0].text, "보고서 v2");
+        assert_eq!(pc.memos[0].id, pc_id, "이 PC의 id는 유지");
+
+        // 예전 파일을 다시 넣어도 최신 내용이 덮어써지지 않음
+        let r = import_into(&mut pc, f_old, &cats(&["업무"]), false);
+        assert_eq!((r.added, r.skipped), (0, 1));
+        assert_eq!(pc.memos[0].text, "보고서 v2");
+    }
+
+    #[test]
+    fn old_files_without_uid_dedup_by_content() {
+        let mut f = export(&laptop(), &["업무"]);
+        for m in f.memos.iter_mut() {
+            m.uid.clear();
+            m.updated = 0;
+        }
+        let mut pc = data(&["업무"], vec![memo(1, "P1", "업무", "보고서", 50)]);
+        let r = import_into(&mut pc, f, &cats(&["업무"]), false);
+        assert_eq!((r.added, r.skipped), (0, 1));
+    }
+
+    #[test]
+    fn replace_mode() {
+        let f = export(&laptop(), &["업무"]);
+        let mut pc = data(&["업무", "기타"], vec![
+            memo(1, "L1", "업무", "보고서 옛날", 50),
+            memo(2, "P2", "업무", "PC에만 있던 것", 50),
+            memo(3, "P3", "기타", "다른 카테고리", 50),
+        ]);
+        let r = import_into(&mut pc, f, &cats(&["업무"]), true);
+        assert_eq!((r.added, r.removed), (1, 2));
+        let mut t: Vec<&str> = pc.memos.iter().map(|m| m.text.as_str()).collect();
+        t.sort();
+        assert_eq!(t, vec!["다른 카테고리", "보고서"]);
+        assert!(pc.deleted.contains_key("P2"), "사라진 항목은 동기화로도 지워지게 기록");
+        assert!(!pc.deleted.contains_key("L1"), "다시 넣은 항목은 삭제 기록 없음");
+        assert_eq!(pc.memos.iter().find(|m| m.uid == "L1").unwrap().id, 1, "같은 항목은 id 유지");
+    }
+
+    #[test]
+    fn new_ids_skip_locked_items() {
+        let f = export(&laptop(), &["업무"]);
+        let mut pc = data(&["업무"], vec![]);
+        pc.hidden_max_id = 10;
+        import_into(&mut pc, f, &cats(&["업무"]), false);
+        assert_eq!(pc.memos[0].id, 11);
+    }
+
+    #[test]
+    fn memos_json_can_be_picked_directly() {
+        let mut d = laptop();
+        d.vault = Some("abcd".into());
+        let j = serde_json::to_string(&d).unwrap();
+        let f: ExportFile = serde_json::from_str(&j).unwrap();
+        assert_eq!(f.memos.len(), 4);
+    }
 }

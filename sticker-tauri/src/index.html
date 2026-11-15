@@ -34,6 +34,52 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
 .csw:hover{transform:scale(1.15)}
 .csw.sel{border-color:#333;box-shadow:0 0 0 2px rgba(0,0,0,.15)}
 .csw-custom{width:20px;height:20px;border-radius:50%;border:1px dashed #aaa;cursor:pointer;padding:0;overflow:hidden;position:relative;flex-shrink:0}
+.xl{display:flex;flex-direction:column;gap:2px;max-height:150px;overflow-y:auto;margin:4px 0}
+.xl label{display:flex;align-items:center;gap:6px;padding:3px 6px;border-radius:4px;cursor:pointer;font-size:calc(var(--fs) - 1px)}
+.xl label:hover{background:#f0f0ea}
+.xl input{width:15px;height:15px;accent-color:#5CB85C;cursor:pointer}
+.xl .n{color:#999;font-size:calc(var(--fs) - 2px)}
+.xl .new{color:#2E7D32;font-size:calc(var(--fs) - 3px);background:#E8F5E9;padding:0 5px;border-radius:3px}
+.xs{font-weight:bold;font-size:calc(var(--fs) - 1px);margin-top:10px;display:flex;align-items:center;gap:6px}
+.xs .all{margin-left:auto;font-weight:normal;font-size:calc(var(--fs) - 2px);color:#888;cursor:pointer}
+.xs .all:hover{color:#333}
+.xd{border-top:1px solid #E4E3DC;margin:14px 0 10px}
+/* 설정: 항목별로 접었다 펴기 */
+.sec{border-top:1px solid #E4E3DC}
+.sh{display:flex;align-items:center;gap:6px;padding:9px 2px;cursor:pointer;font-weight:bold;font-size:var(--fs);user-select:none}
+.sh:hover{color:#000}
+.sh .ti{display:flex;align-items:center;gap:6px}
+.sh .cv{flex:none;color:#aaa;transition:transform .15s}
+.sh .sum{margin-left:auto;font-weight:normal;font-size:calc(var(--fs) - 2px);color:#999;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sh .sum.on{color:#2E7D32}
+.sh .sum.warn{color:#E65100}
+.sec.open .cv{transform:rotate(90deg)}
+.sb{display:none;padding:0 2px 12px}
+.sec.open .sb{display:block}
+.xh{font-size:calc(var(--fs) - 3px);color:#999;line-height:1.5}
+.xm{display:flex;flex-direction:column;gap:3px;margin:4px 0;font-size:calc(var(--fs) - 2px)}
+.xm label{display:flex;align-items:flex-start;gap:5px;cursor:pointer}
+.xm input{accent-color:#5CB85C;margin-top:3px}
+.yo{display:flex;align-items:flex-start;gap:6px;cursor:pointer;font-size:calc(var(--fs) - 1px);margin-top:8px;line-height:1.45}
+.yo input{width:15px;height:15px;accent-color:#5CB85C;cursor:pointer;margin-top:2px;flex:none}
+.yo .xh{display:block}
+.ys{font-size:calc(var(--fs) - 2px);color:#2E7D32;margin:3px 0 0 21px;line-height:1.5}
+.ys.off{color:#999}
+.ycode{font-family:Consolas,monospace;font-size:calc(var(--fs) + 1px);letter-spacing:1px;background:#F5F4EE;border:1px solid #E4E3DC;border-radius:4px;padding:4px 8px;user-select:all}
+.ynew{background:#FFFDE7;border:1px solid #FFE082;border-radius:5px;padding:8px;margin-top:6px;font-size:calc(var(--fs) - 2px);line-height:1.5}
+.msg.err{background:#FFEBEE;color:#C62828}
+.pw-ov{position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:300;display:flex;align-items:center;justify-content:center}
+.pw-box{background:#fff;border-radius:10px;padding:18px 20px;width:88%;max-width:340px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.pw-box h4{font-size:calc(var(--fs) + 1px);display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.pw-box .xh{margin-bottom:8px}
+.pw-box input{width:100%;padding:7px 10px;border:1px solid #D4D3CC;border-radius:5px;font-size:var(--fs);font-family:inherit;outline:none;margin-top:6px}
+.pw-box input:focus{border-color:#5CB85C}
+.pw-box .er{color:#C62828;font-size:calc(var(--fs) - 2px);min-height:1.4em;margin-top:6px}
+.pw-box .bb{display:flex;gap:6px;margin-top:6px}
+.pw-box .bb button{flex:1;padding:7px 0;border:none;border-radius:6px;cursor:pointer;font-family:inherit;font-size:calc(var(--fs) - 1px)}
+.pw-box .lk{display:block;margin-top:10px;font-size:calc(var(--fs) - 2px);color:#888;cursor:pointer;text-align:center}
+.pw-box .lk:hover{color:#333;text-decoration:underline}
+#lkB.locked{background:#FFF3E0;border-color:#FFB74D;color:#E65100}
 .csw-custom input{position:absolute;top:-4px;left:-4px;width:28px;height:28px;border:none;cursor:pointer;opacity:0}
 </style>
 </head><body>
@@ -68,6 +114,7 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <button class="bt" onclick="invoke('show_window',{label:'trash'})" id="trB">휴지통</button>
   <button class="bt" onclick="invoke('show_window',{label:'calendar'})" id="calB">달력</button>
   <button class="bt" onclick="invoke('show_window',{label:'notes'})" id="ntB">메모장</button>
+  <button class="bt" onclick="lkClick()" id="lkB" style="display:none"></button>
   <button class="bt" onclick="invoke('open_guide')" id="hpB">사용법</button>
  </div>
  <div class="pn" id="cp"><h3 id="cT"></h3><div id="cl"></div>
@@ -79,6 +126,8 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <div style="font-size:calc(var(--fs) - 3px);color:#aaa;margin-top:4px">※ 드래그로 순서 변경 가능</div>
   </div>
  <div class="pn" id="sp"><h3 id="sT"></h3>
+  <div class="sec" id="secB"><div class="sh" onclick="secTog('B')"><svg class="cv" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg><span class="ti" id="bT"></span><span class="sum" id="sumB"></span></div>
+  <div class="sb">
   <div class="sr"><label>폰트:</label>
    <div class="font-wrap" style="flex:1">
     <input class="font-input" id="sF" readonly onclick="openFP()" placeholder="폰트 선택...">
@@ -95,6 +144,118 @@ select{padding:7px 8px;border:1px solid #D4D3CC;border-radius:5px;font-size:calc
   <div class="sr"><label>달력 색상:</label><div id="calColors" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap"></div></div>
   <div class="pb"><button onclick="apS()" style="background:#C8E6C9;color:#2E7D32">적용</button></div>
   <div class="msg" id="msg">저장 완료!</div>
+  </div></div>
+  <div class="sec" id="secX"><div class="sh" onclick="secTog('X')"><svg class="cv" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg><span class="ti" id="xT"></span><span class="sum" id="sumX"></span></div>
+  <div class="sb">
+  <div class="xh">다른 컴퓨터에서도 똑같이 쓰려면, 여기서 카테고리를 골라 파일(.json)로 내보낸 뒤 그 컴퓨터의 Todi 설정에서 불러오세요. (USB·메일·클라우드 등으로 파일을 옮기면 돼요)</div>
+  <div class="xh" style="color:#C62828;margin-top:3px">※ 내보낸 파일은 암호화되지 않아서, 파일을 열면 누구나 내용을 볼 수 있어요. 옮긴 뒤에는 지우거나 안전한 곳에 보관하세요.</div>
+  <div class="xs">내보내기<span class="all" onclick="xAll('xEl')">전체 선택/해제</span></div>
+  <div class="xl" id="xEl"></div>
+  <div class="pb"><button onclick="doExport()" style="background:#C8E6C9;color:#2E7D32">파일로 내보내기</button></div>
+  <div class="xs">불러오기<span class="all" id="xIAll" style="display:none" onclick="xAll('xIl')">전체 선택/해제</span></div>
+  <div class="pb" style="margin-top:4px"><button onclick="pickImport()" style="background:#E3F2FD;color:#1565C0">파일 열기...</button><span id="xIf" class="xh" style="align-self:center"></span></div>
+  <div id="xIb" style="display:none">
+   <div class="xl" id="xIl"></div>
+   <div class="xm">
+    <label><input type="radio" name="xMode" value="replace" checked><span><b>똑같이 맞추기</b> — 고른 카테고리의 이 컴퓨터 항목을 파일 내용으로 바꿔요</span></label>
+    <label><input type="radio" name="xMode" value="merge"><span><b>추가만 하기</b> — 지금 항목은 그대로 두고, 없는 항목만 더해요</span></label>
+   </div>
+   <div class="pb"><button onclick="doImport()" style="background:#C8E6C9;color:#2E7D32">불러오기</button></div>
+  </div>
+  <div class="msg" id="xMsg"></div>
+  </div></div>
+  <div class="sec" id="secY"><div class="sh" onclick="secTog('Y')"><svg class="cv" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg><span class="ti" id="yT"></span><span class="sum" id="sumY"></span></div>
+  <div class="sb">
+  <div class="xh">추가·완료·수정한 내용이 다른 컴퓨터에도 <b>자동으로</b> 반영돼요. 두 컴퓨터에 같은 <b>동기화 코드</b>를 넣으면 연결돼요.
+   주고받는 내용은 이 코드로 암호화돼서, 코드를 모르는 사람은 (클라우드 회사도) 내용을 볼 수 없어요.</div>
+  <div id="yOff">
+   <div class="pb"><button onclick="syNew()" style="background:#C8E6C9;color:#2E7D32">새 동기화 코드 만들기</button></div>
+   <div class="xh" style="margin-top:8px">다른 컴퓨터에서 이미 코드를 만들었다면 그 코드를 넣으세요.</div>
+   <div class="row" style="margin-top:4px"><input type="text" id="yIn" placeholder="XXXX-XXXX-XXXX-XXXX" style="font-family:Consolas,monospace;letter-spacing:1px"><button class="bt" onclick="syJoin()">연결</button></div>
+   <div class="msg" id="yJoinMsg" style="margin-top:6px"></div>
+  </div>
+  <div id="yOn" style="display:none">
+   <div class="row" style="margin-top:6px"><span style="font-size:calc(var(--fs) - 1px)">동기화 코드</span><span class="ycode" id="yCv"></span>
+    <button class="bt" onclick="syShow()" id="yShowB">보기</button><button class="bt" onclick="syCopy()">복사</button></div>
+   <div class="ynew" id="yNewHint" style="display:none">이 코드를 <b>다른 컴퓨터의 Todi → 설정 → 자동 동기화</b>에 넣으세요. 코드는 다른 사람에게 알려 주지 마세요.</div>
+   <div class="xs">보낼 카테고리<span class="all" onclick="xAll('yCats');sySaveCats()">전체 선택/해제</span></div>
+   <div class="xh">체크한 카테고리를 다른 컴퓨터로 보내고, 그쪽에서 바뀐 내용도 받아 와요.
+    <b>받기만 할 컴퓨터는 고르지 않아도 돼요</b> — 다른 컴퓨터가 보낸 카테고리는 여기에 자동으로 추가되고 체크돼요. 받고 싶지 않은 카테고리는 체크를 끄세요.</div>
+   <div class="xl" id="yCats"></div>
+   <div class="xs">방법 <span style="font-weight:normal;font-size:calc(var(--fs) - 3px);color:#999">(하나만 켜도 되고, 둘 다 켜도 돼요)</span></div>
+   <label class="yo"><input type="checkbox" id="yLan" onchange="invoke('sync_set_lan',{on:this.checked}).then(syRender)"><span><b>같은 와이파이</b>
+    <span class="xh">두 컴퓨터가 같은 네트워크에서 켜져 있으면 바로바로 맞춰요. 내용이 인터넷으로 나가지 않아요. 처음 켤 때 Windows 방화벽 창이 뜨면 <b>허용</b>을 눌러 주세요.</span></span></label>
+   <div class="ys off" id="yLanS"></div>
+   <div id="yLanX" style="display:none;margin-left:21px">
+    <div class="xh" id="yMe"></div>
+    <div class="ynew" id="yOther" style="display:none"></div>
+    <div class="ynew" id="yHelp" style="display:none">다른 컴퓨터를 아직 찾지 못했어요. 이렇게 확인해 보세요.<br>
+     ① 두 컴퓨터 모두 새 버전 Todi가 켜져 있고, 같은 코드에 <b>같은 와이파이</b>가 켜져 있는지<br>
+     ② 두 컴퓨터가 같은 공유기에 연결돼 있는지 (유선·무선이 섞여 있어도 괜찮아요. 손님용 와이파이는 서로 안 보일 수 있어요)<br>
+     ③ Windows 방화벽에서 Todi가 허용돼 있는지 — 방화벽 창에서 취소를 눌렀다면: <b>설정 → 개인 정보 및 보안 → Windows 보안 → 방화벽 및 네트워크 보호 → 방화벽에서 앱 허용</b>에서 Todi의 <b>개인·공용</b>을 모두 체크<br>
+     ④ 그래도 안 되면 아래 칸에 다른 컴퓨터에 표시된 주소를 넣어 보세요. 한쪽에만 넣으면 되는데, <b>응답이 없다고 나오면 반대쪽 컴퓨터에 넣어 보세요.</b>
+     (모뎀과 공유기가 따로 있는 집처럼 두 컴퓨터가 다른 공유기에 연결돼 있으면, 한쪽 방향으로만 연결될 수 있어요)</div>
+    <div class="row" style="margin-top:4px"><input type="text" id="yPeer" placeholder="다른 컴퓨터 주소 (선택, 예: 192.168.0.12)"><button class="bt" onclick="sySetPeer()">저장</button></div>
+    <div class="xh" id="yPeerS"></div>
+    <div class="msg" id="yMsg"></div>
+   </div>
+   <label class="yo"><input type="checkbox" id="yFold" onchange="syFoldToggle(this)"><span><b>클라우드 · 공유 폴더</b>
+    <span class="xh">OneDrive·구글 드라이브·네이버 MYBOX처럼 두 컴퓨터가 함께 보는 폴더를 고르면, 떨어진 곳(집 ↔ 학교·회사)끼리도 맞출 수 있어요.</span></span></label>
+   <div class="row" style="margin:3px 0 0 21px"><span class="xh" id="yFp" style="flex:1;word-break:break-all"></span><button class="bt" onclick="syPick()">폴더 고르기</button></div>
+   <div class="ys off" id="yFoldS"></div>
+   <div class="msg err" id="yErr"></div>
+   <div class="pb" style="margin-top:10px">
+    <button onclick="syNow()" style="background:#E3F2FD;color:#1565C0">지금 맞추기</button>
+    <button onclick="syOffAsk()" style="background:#FFCDD2;color:#C62828">동기화 끊기</button>
+   </div>
+   <div class="msg" id="yNowMsg" style="margin-top:6px"></div>
+  </div>
+  </div></div>
+  <div class="sec" id="secZ"><div class="sh" onclick="secTog('Z')"><svg class="cv" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"/></svg><span class="ti" id="zT"></span><span class="sum" id="sumZ"></span></div>
+  <div class="sb">
+  <div class="xh">회사·공용 PC처럼 다른 사람이 볼 수 있는 곳에서, 고른 카테고리를 비밀번호로 잠가 숨겨요.
+   잠기면 그 카테고리는 모든 창에서 사라지고, 데이터 파일 안에서도 암호화돼서 파일을 직접 열어도 읽을 수 없어요.</div>
+  <div id="zOff">
+   <div class="pb"><button onclick="zOpenSetup()" id="zOpenB" style="background:#C8E6C9;color:#2E7D32">잠금 설정하기</button></div>
+   <div id="zSetup" style="display:none">
+    <div class="xs">숨길 카테고리</div>
+    <div class="xl" id="zCats"></div>
+    <div class="xs">잠그는 방식</div>
+    <div class="xm">
+     <label><input type="radio" name="zMode" value="always" checked onchange="zIdleShow('zMode','zIdleRow')"><span><b>항상 잠금</b> — Todi를 켤 때마다 잠긴 채로 시작해요. 풀어 둔 뒤 한동안 손대지 않으면 다시 잠겨요. (회사·공용 PC)</span></label>
+     <label><input type="radio" name="zMode" value="manual" onchange="zIdleShow('zMode','zIdleRow')"><span><b>필요할 때만</b> — 평소엔 그대로 보이고, 패널의 <b>잠그기</b>를 누를 때만 잠겨요. (휴가, 다른 사람이 잠깐 쓸 때)</span></label>
+    </div>
+    <div class="sr" id="zIdleRow"><label>다시 잠그기:</label><select id="zIdle">
+     <option value="5">5분 동안 안 쓰면</option><option value="10" selected>10분 동안 안 쓰면</option><option value="30">30분 동안 안 쓰면</option><option value="60">1시간 동안 안 쓰면</option><option value="0">자동으로 잠그지 않음</option></select></div>
+    <div class="sr"><label>비밀번호:</label><input type="password" id="zPw" placeholder="4자 이상"></div>
+    <div class="sr"><label>비밀번호 확인:</label><input type="password" id="zPw2"></div>
+    <div class="pb"><button onclick="zSetup()" style="background:#C8E6C9;color:#2E7D32">잠금 설정</button><button onclick="zCloseSetup()" style="background:#F0EFE8;color:#555">취소</button></div>
+   </div>
+  </div>
+  <div class="ynew" id="zRc" style="display:none">
+   <b>복구 코드</b> — 비밀번호를 잊었을 때는 이 코드로만 풀 수 있어요. <b>지금 꼭 적어 두거나 사진으로 남겨 두세요.</b> 다시 보여 드릴 수 없어요.
+   <div class="row" style="margin-top:6px"><span class="ycode" id="zRcV"></span><button class="bt" onclick="zCopyRc()">복사</button></div>
+   <div class="pb"><button onclick="zRcDone()" style="background:#C8E6C9;color:#2E7D32">적어 두었어요</button></div>
+  </div>
+  <div id="zLocked" style="display:none"><div class="xh" style="color:#E65100">지금 잠겨 있어요. 잠금 설정을 바꾸려면 패널의 <b>잠금 풀기</b>를 먼저 눌러 주세요.</div></div>
+  <div id="zOn" style="display:none">
+   <div class="xs">숨길 카테고리</div>
+   <div class="xl" id="zCats2"></div>
+   <div class="xs">잠그는 방식</div>
+   <div class="xm">
+    <label><input type="radio" name="zMode2" value="always" onchange="zSaveMode()"><span><b>항상 잠금</b> — 켤 때마다 잠긴 채로 시작</span></label>
+    <label><input type="radio" name="zMode2" value="manual" onchange="zSaveMode()"><span><b>필요할 때만</b> — 잠그기를 누를 때만</span></label>
+   </div>
+   <div class="sr" id="zIdleRow2"><label>다시 잠그기:</label><select id="zIdle2" onchange="zSaveMode()">
+    <option value="5">5분 동안 안 쓰면</option><option value="10">10분 동안 안 쓰면</option><option value="30">30분 동안 안 쓰면</option><option value="60">1시간 동안 안 쓰면</option><option value="0">자동으로 잠그지 않음</option></select></div>
+   <div class="pb">
+    <button onclick="invoke('lock_now')" style="background:#FFF3E0;color:#E65100">지금 잠그기</button>
+    <button onclick="zChangePw()" style="background:#E3F2FD;color:#1565C0">비밀번호 바꾸기</button>
+    <button onclick="zDisable()" style="background:#FFCDD2;color:#C62828">잠금 끄기</button>
+   </div>
+  </div>
+  <div class="msg" id="zMsg"></div>
+  </div></div>
  </div>
 </div>
 
@@ -115,10 +276,14 @@ document.getElementById('dnB').innerHTML=S.done+' 완료';
 document.getElementById('trB').innerHTML=S.trash+' 휴지통';
 document.getElementById('calB').innerHTML=S.cal+' 달력';
 document.getElementById('ntB').innerHTML=S.note+' 메모장';
+document.getElementById('xT').innerHTML=S.open+' 데이터 내보내기 / 불러오기';
+document.getElementById('yT').innerHTML=S.doing+' 자동 동기화';
+document.getElementById('zT').innerHTML=S.lock+' 잠금 (카테고리 숨기기)';
 document.getElementById('hpB').innerHTML=S.help+' 사용법';
 document.getElementById('micB').innerHTML=S.mic;
 document.getElementById('cT').innerHTML=S.tag+' 카테고리 관리';
 document.getElementById('sT').innerHTML=S.gear+' 설정';
+document.getElementById('bT').innerHTML=S.gear+' 글꼴 · 화면 · 시작';
 document.getElementById('acB').innerHTML=S.plus+' 추가';
 document.getElementById('rcB').innerHTML=S.edit+' 이름변경';
 document.getElementById('dcB').innerHTML=S.trash+' 삭제';
@@ -213,8 +378,22 @@ async function addM(){
   inp.value='';dsc.value='';dd.value='';so.checked=false;inp.focus()}
 document.getElementById('inp').addEventListener('keydown',e=>{if(e.key==='Enter')addM()});
 
+// ── 설정 항목 접기/펴기 (펼친 항목은 기억) ──
+function secOpen(){try{return JSON.parse(localStorage.getItem('todi.secOpen')||'[]')}catch(e){return []}}
+function secApply(){const o=secOpen();['B','X','Y','Z'].forEach(k=>document.getElementById('sec'+k).classList.toggle('open',o.includes(k)))}
+function secTog(k){
+  const o=new Set(secOpen());o.has(k)?o.delete(k):o.add(k);
+  try{localStorage.setItem('todi.secOpen',JSON.stringify([...o]))}catch(e){}
+  secApply();
+}
+// 접힌 채로도 상태가 보이게, 제목 줄 오른쪽에 요약
+function secSum(k,text,cls){const e=document.getElementById('sum'+k);e.textContent=text;e.className='sum'+(cls?' '+cls:'')}
+secApply();
+secSum('X','다른 컴퓨터로 옮기기');
+
 function tog(id){['cp','sp'].forEach(x=>{if(x!==id)document.getElementById(x).classList.remove('show')});
   document.getElementById(id).classList.toggle('show');
+  if(id==='sp'){renderExport();syRender();zRender();sumBasic();}
   // 설정 열 때 폰트 드롭다운 닫기
   document.getElementById('fDrop').classList.remove('show');
 }
@@ -277,10 +456,15 @@ document.addEventListener('click',e=>{
 });
 
 function setOpacity(v){document.getElementById('sOV').textContent=v+'%';invoke('set_opacity',{value:parseInt(v)/100})}
-function toggleAutostart(v){invoke('set_autostart',{enabled:v})}
+function toggleAutostart(v){invoke('set_autostart',{enabled:v}).then(sumBasic)}
+function sumBasic(){
+  const f=document.getElementById('sF').value,z=document.getElementById('sS').value;
+  secSum('B',[f,z?z+'px':'',document.getElementById('sA').checked?'시작 시 실행':''].filter(Boolean).join(' · '));
+}
 async function apS(){
   await invoke('save_user_settings',{fontFamily:document.getElementById('sF').value.trim(),fontSize:parseInt(document.getElementById('sS').value)||14});
   const m=document.getElementById('msg');m.classList.add('show');setTimeout(()=>m.classList.remove('show'),2000);
+  sumBasic();
 }
 
 // ── 달력 색상 ──
@@ -313,9 +497,324 @@ function pickCalCustom(hex){
   renderCalColors();
 }
 
+// ── 다른 컴퓨터로 옮기기 ──
+// 카테고리별 항목 수 (휴지통 제외)
+function catCounts(memos){const n={};memos.filter(m=>m.status!=='trash').forEach(m=>n[m.category]=(n[m.category]||0)+1);return n}
+function catList(elId,cats,counts,isNew){
+  const el=document.getElementById(elId),prev=new Set([...el.querySelectorAll('input:not(:checked)')].map(i=>i.value));
+  el.innerHTML=cats.map(c=>`<label><input type="checkbox" value="${esc(c)}"${prev.has(c)?'':' checked'}>${esc(c)}<span class="n">${counts[c]||0}개</span>${isNew&&isNew(c)?'<span class="new">새 카테고리</span>':''}</label>`).join('');
+}
+function checked(elId){return [...document.querySelectorAll('#'+elId+' input:checked')].map(i=>i.value)}
+function xAll(elId){const bs=[...document.querySelectorAll('#'+elId+' input')],on=bs.some(b=>!b.checked);bs.forEach(b=>b.checked=on)}
+function xMsg(t,err){const m=document.getElementById('xMsg');m.textContent=t;m.classList.toggle('err',!!err);m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),5000)}
+async function renderExport(){
+  const d=await invoke('get_all_data');
+  catList('xEl',d.categories,catCounts(d.memos));
+}
+async function doExport(){
+  const cats=checked('xEl');
+  if(!cats.length){xMsg('내보낼 카테고리를 골라 주세요.',true);return}
+  try{
+    const p=await invoke('export_data',{categories:cats});
+    if(p)xMsg('내보냈어요: '+p);
+  }catch(e){xMsg(String(e),true)}
+}
+let _imp=null;
+async function pickImport(){
+  try{
+    const f=await invoke('open_import_file');
+    if(!f)return;
+    _imp=f;
+    const d=await invoke('get_all_data');
+    // 파일의 카테고리 목록에 없지만 항목에 쓰인 카테고리도 포함
+    const cats=[...f.categories];f.memos.forEach(m=>{if(!cats.includes(m.category))cats.push(m.category)});
+    _imp.categories=cats;
+    document.getElementById('xIl').innerHTML='';
+    catList('xIl',cats,catCounts(f.memos),c=>!d.categories.includes(c));
+    document.getElementById('xIf').textContent=f.exported?`${f.exported}에 내보낸 파일`:'';
+    document.getElementById('xIb').style.display='';
+    document.getElementById('xIAll').style.display='';
+  }catch(e){xMsg(String(e),true)}
+}
+async function doImport(){
+  if(!_imp)return;
+  const cats=checked('xIl');
+  if(!cats.length){xMsg('불러올 카테고리를 골라 주세요.',true);return}
+  const mode=document.querySelector('input[name=xMode]:checked').value;
+  if(mode==='replace'){
+    const d=await invoke('get_all_data'),n=catCounts(d.memos),lose=cats.reduce((s,c)=>s+(n[c]||0),0);
+    if(lose&&!await customConfirm(`이 컴퓨터의 [${cats.join(', ')}] 항목 ${lose}개를 지우고 파일 내용으로 바꿀까요?`,'바꾸기'))return;
+  }
+  try{
+    const r=await invoke('import_data',{file:_imp,categories:cats,mode});
+    xMsg(`불러오기 완료! ${r.added}개 추가`+(r.removed?`, 기존 ${r.removed}개 교체`:'')+(r.skipped?`, 이미 있는 ${r.skipped}개 건너뜀`:''));
+    _imp=null;
+    document.getElementById('xIb').style.display='none';
+    document.getElementById('xIAll').style.display='none';
+    document.getElementById('xIf').textContent='';
+  }catch(e){xMsg(String(e),true)}
+}
+
+// ── 자동 동기화 ──
+let _syShow=false,_syTimer=null;
+function syMask(c){return _syShow?c:c.slice(0,4)+'-••••-••••-••••'}
+async function syRender(){
+  const st=await invoke('get_sync_status');
+  const on=!!st.code;
+  document.getElementById('yOff').style.display=on?'none':'';
+  document.getElementById('yOn').style.display=on?'':'none';
+  clearInterval(_syTimer);_syTimer=null;
+  if(!on){secSum('Y','꺼짐');return}
+  document.getElementById('yCv').textContent=syMask(st.code);
+  document.getElementById('yCv').dataset.code=st.code;
+  const d=await invoke('get_all_data'),n=catCounts(d.memos);
+  document.getElementById('yCats').innerHTML=d.categories.map(c=>`<label><input type="checkbox" value="${esc(c)}"${st.cats.includes(c)?' checked':''} onchange="sySaveCats()">${esc(c)}<span class="n">${n[c]||0}개</span></label>`).join('');
+  document.getElementById('yLan').checked=st.lan;
+  document.getElementById('yPeer').value=st.peer;
+  document.getElementById('yFold').checked=st.folder_on;
+  document.getElementById('yFp').textContent=st.folder||'아직 폴더를 고르지 않았어요';
+  syPaint(st);
+  // 설정을 열어 둔 동안 상태를 계속 새로 고침
+  _syTimer=setInterval(async()=>{
+    if(!document.getElementById('sp').classList.contains('show')){clearInterval(_syTimer);_syTimer=null;return}
+    syPaint(await invoke('get_sync_status'));
+  },2000);
+}
+let _syCats='';
+function syPaint(st){
+  {
+    const ways=[st.lan?'와이파이':'',st.folder_on?'폴더':''].filter(Boolean).join(' · ');
+    const n=st.peers.filter(p=>p.online).length;
+    if(!st.lan&&!st.folder_on)secSum('Y','코드 있음 · 방법을 골라 주세요','warn');
+    else if(st.error)secSum('Y',ways+' · 확인 필요','warn');
+    else if(n)secSum('Y',ways+' · '+n+'대 연결됨','on');
+    else if(st.folder_on&&st.folder_last)secSum('Y',ways+' · '+st.folder_last+' 맞춤','on');
+    else secSum('Y',ways+' · 찾는 중');
+  }
+  // 다른 컴퓨터가 보낸 카테고리가 자동으로 추가되면 목록도 새로 그림
+  const ck=st.cats.join('\n');
+  if(_syCats&&ck!==_syCats)syRender();
+  _syCats=ck;
+  document.getElementById('yLanX').style.display=st.lan?'':'none';
+  document.getElementById('yMe').textContent=st.my_ips.length?'이 컴퓨터 주소: '+st.my_ips.join(', '):'';
+  const found=st.peers.some(p=>p.online);
+  document.getElementById('yHelp').style.display=st.lan&&!found&&st.lan_secs>20&&!st.other_code?'':'none';
+  const oc=document.getElementById('yOther');
+  oc.style.display=st.lan&&!found&&st.other_code?'':'none';
+  oc.innerHTML=`같은 네트워크에서 다른 Todi(${esc(st.other_code)})를 찾았지만 <b>동기화 코드가 달라요.</b> 두 컴퓨터에 같은 코드가 들어 있는지 확인해 주세요. (한쪽에서 코드를 복사해 다른 쪽에 넣으세요)`;
+  document.getElementById('yPeerS').innerHTML=st.lan&&st.lan_secs>10?st.manual.map(([ip,ok])=>ok
+    ?`● ${esc(ip)} — 신호가 오고 있어요`
+    :found
+    // 이 주소로는 닿지 않아도 상대가 먼저 연결해 와서 동기화되고 있으면 문제없음
+    ?`○ ${esc(ip)} — 이 주소로는 닿지 않지만, 다른 컴퓨터 쪽에서 연결해 와서 동기화는 잘 되고 있어요.`
+    :`<span style="color:#C62828">○ ${esc(ip)} — 응답이 없어요.</span> 주소가 맞는지, 그 컴퓨터에서 새 버전 Todi와 <b>같은 와이파이</b>가 켜져 있는지 확인해 주세요. 그래도 안 되면 이 칸은 비우고, <b>다른 컴퓨터에 이 컴퓨터 주소를 넣어 보세요.</b>`).join('<br>'):'';
+  const ls=document.getElementById('yLanS');
+  if(!st.lan){ls.textContent='';}
+  else if(st.peers.length){
+    ls.innerHTML=st.peers.map(p=>`${p.online?'● ':'○ '}${esc(p.name)} — ${p.online?'연결됨':'연결 끊김'}, 마지막으로 맞춘 시각 ${esc(p.last_sync)}`).join('<br>');
+    ls.classList.toggle('off',!st.peers.some(p=>p.online));
+  }else{ls.textContent='같은 코드를 넣은 컴퓨터를 찾는 중... (그 컴퓨터도 Todi가 켜져 있고 와이파이 동기화가 켜져 있어야 해요)';ls.classList.add('off');}
+  const fs=document.getElementById('yFoldS');
+  if(!st.folder_on){fs.textContent='';}
+  else{fs.textContent=st.folder_last?`마지막으로 맞춘 시각 ${st.folder_last}`:'폴더와 맞추는 중...';fs.classList.toggle('off',!st.folder_last);}
+  const er=document.getElementById('yErr');
+  er.textContent=st.error;er.classList.toggle('show',!!st.error);
+}
+async function syNew(){
+  await invoke('sync_new_code');
+  _syShow=true;
+  await syRender();
+  document.getElementById('yNewHint').style.display='';
+  document.getElementById('yShowB').textContent='숨기기';
+}
+async function syJoin(){
+  const v=document.getElementById('yIn').value;
+  try{
+    await invoke('sync_set_code',{code:v});
+    document.getElementById('yIn').value='';
+    _syShow=false;
+    await syRender();
+  }catch(e){syMsg(String(e),true)}
+}
+function syShow(){
+  _syShow=!_syShow;
+  const el=document.getElementById('yCv');
+  el.textContent=syMask(el.dataset.code);
+  document.getElementById('yShowB').textContent=_syShow?'숨기기':'보기';
+}
+async function syCopy(){
+  try{await navigator.clipboard.writeText(document.getElementById('yCv').dataset.code);syMsg('코드를 복사했어요.')}catch(e){syMsg('복사하지 못했어요. 보기를 눌러 직접 옮겨 적어 주세요.',true)}
+}
+async function sySetPeer(){
+  const m=document.getElementById('yMsg'),show=(t,err)=>{m.textContent=t;m.classList.toggle('err',!!err);m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),5000)};
+  try{await invoke('sync_set_peer',{peer:document.getElementById('yPeer').value});show('저장했어요. 몇 초 안에 연결을 시도해요.')}
+  catch(e){show(String(e),true)}
+}
+async function sySaveCats(){
+  await invoke('sync_set_cats',{cats:checked('yCats')});
+  syPaint(await invoke('get_sync_status'));
+}
+async function syPick(){
+  try{
+    const p=await invoke('sync_pick_folder');
+    if(p)await syRender();
+  }catch(e){syMsg(String(e),true)}
+}
+async function syFoldToggle(cb){
+  const st=await invoke('get_sync_status');
+  if(cb.checked&&!st.folder){cb.checked=false;await syPick();return}
+  await invoke('sync_set_folder_on',{on:cb.checked});
+  syPaint(await invoke('get_sync_status'));
+}
+// 동기화 칸의 알림은 그 칸 안에 (보고 있는 버튼 바로 아래)
+function syMsg(t,err){
+  const id=document.getElementById('yOn').style.display==='none'?'yJoinMsg':'yNowMsg',m=document.getElementById(id);
+  m.textContent=t;m.classList.toggle('err',!!err);m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),5000);
+}
+async function syNow(){await invoke('sync_now');syMsg('다시 맞추는 중이에요. 몇 초 뒤에 반영돼요.')}
+async function syOffAsk(){
+  if(!await customConfirm('자동 동기화를 끊을까요? 지금 있는 항목은 그대로 남아요.','끊기'))return;
+  await invoke('sync_clear');
+  document.getElementById('yNewHint').style.display='none';
+  await syRender();
+}
+
+// ── 잠금 (카테고리 숨기기) ──
+function zMsg(t,err){const m=document.getElementById('zMsg');m.textContent=t;m.classList.toggle('err',!!err);m.classList.add('show');clearTimeout(m._t);m._t=setTimeout(()=>m.classList.remove('show'),5000)}
+function zIdleShow(radio,row){
+  const v=document.querySelector(`input[name=${radio}]:checked`).value;
+  document.getElementById(row).style.display=v==='always'?'':'none';
+}
+// 패널의 잠금 버튼
+async function lkRender(){
+  const st=await invoke('lock_status'),b=document.getElementById('lkB');
+  b.style.display=st.configured?'':'none';
+  b.classList.toggle('locked',st.locked);
+  b.innerHTML=st.locked?S.lock+' 잠금 풀기':S.unlock+' 잠그기';
+  b.title=st.locked?'숨긴 카테고리 보이기 (비밀번호 필요)':'숨길 카테고리를 지금 잠가요';
+}
+async function lkClick(){
+  const st=await invoke('lock_status');
+  if(!st.locked){await invoke('lock_now');return}
+  unlockDialog();
+}
+// 비밀번호 입력 창. fields: [{id,ph,type}], onOk(values) → 오류 문구(문자열)를 돌려주면 창을 닫지 않고 보여 줌
+function pwDialog({title,desc,fields,okText,link,onOk}){
+  const old=document.getElementById('_pw');if(old)old.remove();
+  const ov=document.createElement('div');ov.id='_pw';ov.className='pw-ov';
+  ov.innerHTML=`<div class="pw-box"><h4>${S.lock} ${esc(title)}</h4>${desc?`<div class="xh">${desc}</div>`:''}
+    ${fields.map(f=>`<input id="${f.id}" type="${f.type||'password'}" placeholder="${esc(f.ph||'')}" autocomplete="off">`).join('')}
+    <div class="er" id="_pwE"></div>
+    <div class="bb"><button id="_pwN" style="background:#F0EFE8;color:#555">취소</button><button id="_pwY" style="background:#5CB85C;color:#fff">${esc(okText||'확인')}</button></div>
+    ${link?`<span class="lk" id="_pwL">${esc(link.text)}</span>`:''}</div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  const ok=async()=>{
+    const y=document.getElementById('_pwY');if(y.disabled)return;
+    const vals={};fields.forEach(f=>vals[f.id]=document.getElementById(f.id).value);
+    y.disabled=true;y.textContent='확인 중...';
+    const err=await onOk(vals);
+    if(err){document.getElementById('_pwE').textContent=err;y.disabled=false;y.textContent=okText||'확인';return}
+    close();
+  };
+  document.getElementById('_pwN').onclick=close;
+  document.getElementById('_pwY').onclick=ok;
+  ov.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)ok();if(e.key==='Escape')close()}));
+  if(link)document.getElementById('_pwL').onclick=()=>{close();link.onClick()};
+  setTimeout(()=>document.getElementById(fields[0].id).focus(),30);
+}
+function unlockDialog(){
+  pwDialog({title:'잠금 풀기',fields:[{id:'_u1',ph:'비밀번호'}],okText:'풀기',
+    link:{text:'비밀번호를 잊었어요',onClick:recoverDialog},
+    onOk:async v=>{try{await invoke('lock_unlock',{password:v._u1})}catch(e){return String(e)}}});
+}
+function recoverDialog(){
+  pwDialog({title:'복구 코드로 풀기',desc:'잠금을 설정할 때 받은 <b>복구 코드</b>를 넣고, 앞으로 쓸 새 비밀번호를 정해 주세요.',
+    fields:[{id:'_r1',ph:'복구 코드 (XXXX-XXXX-XXXX-XXXX)',type:'text'},{id:'_r2',ph:'새 비밀번호 (4자 이상)'},{id:'_r3',ph:'새 비밀번호 확인'}],
+    okText:'풀기',
+    onOk:async v=>{
+      if(v._r2!==v._r3)return '새 비밀번호가 서로 달라요.';
+      try{await invoke('lock_recover',{code:v._r1,newPassword:v._r2})}catch(e){return String(e)}
+    }});
+}
+async function zRender(){
+  const st=await invoke('lock_status');
+  const show=(id,on)=>document.getElementById(id).style.display=on?'':'none';
+  show('zOff',!st.configured);show('zLocked',st.configured&&st.locked);show('zOn',st.configured&&!st.locked);
+  if(!st.configured)secSum('Z','사용 안 함');
+  else if(st.locked)secSum('Z','잠김','warn');
+  else secSum('Z',`풀림 · ${st.cats.length}개 카테고리 · ${st.mode==='always'?'항상 잠금':'필요할 때만'}`,'on');
+  if(!st.configured||st.locked)return;
+  const d=await invoke('get_all_data'),n=catCounts(d.memos);
+  document.getElementById('zCats2').innerHTML=d.categories.map(c=>`<label><input type="checkbox" value="${esc(c)}"${st.cats.includes(c)?' checked':''} onchange="zSaveCats(this)">${esc(c)}<span class="n">${n[c]||0}개</span></label>`).join('');
+  document.querySelector(`input[name=zMode2][value=${st.mode}]`).checked=true;
+  document.getElementById('zIdle2').value=String(st.idle_min);
+  zIdleShow('zMode2','zIdleRow2');
+}
+async function zOpenSetup(){
+  const d=await invoke('get_all_data'),n=catCounts(d.memos);
+  document.getElementById('zCats').innerHTML=d.categories.map(c=>`<label><input type="checkbox" value="${esc(c)}">${esc(c)}<span class="n">${n[c]||0}개</span></label>`).join('');
+  document.getElementById('zSetup').style.display='';
+  document.getElementById('zOpenB').style.display='none';
+  zIdleShow('zMode','zIdleRow');
+}
+function zCloseSetup(){
+  document.getElementById('zSetup').style.display='none';
+  document.getElementById('zOpenB').style.display='';
+  document.getElementById('zPw').value='';document.getElementById('zPw2').value='';
+}
+async function zSetup(){
+  const pw=document.getElementById('zPw').value,pw2=document.getElementById('zPw2').value;
+  if(pw!==pw2){zMsg('비밀번호가 서로 달라요.',true);return}
+  const mode=document.querySelector('input[name=zMode]:checked').value;
+  try{
+    const rc=await invoke('lock_setup',{password:pw,cats:checked('zCats'),mode,idleMin:parseInt(document.getElementById('zIdle').value)});
+    zCloseSetup();
+    document.getElementById('zRcV').textContent=rc;
+    document.getElementById('zRc').style.display='';
+    await zRender();
+    // 복구 코드를 적기 전에는 다른 칸을 감춰서 놓치지 않게
+    document.getElementById('zOn').style.display='none';
+  }catch(e){zMsg(String(e),true)}
+}
+async function zCopyRc(){
+  try{await navigator.clipboard.writeText(document.getElementById('zRcV').textContent);zMsg('복구 코드를 복사했어요. 안전한 곳에 붙여 넣어 두세요.')}catch(e){zMsg('복사하지 못했어요. 직접 옮겨 적어 주세요.',true)}
+}
+async function zRcDone(){
+  document.getElementById('zRc').style.display='none';
+  document.getElementById('zRcV').textContent='';
+  await zRender();
+  zMsg('잠금을 설정했어요. 패널의 잠그기 버튼으로 잠글 수 있어요.');
+}
+async function zSaveCats(cb){
+  try{await invoke('lock_set_cats',{cats:checked('zCats2')})}
+  catch(e){cb.checked=!cb.checked;zMsg(String(e),true)}
+}
+async function zSaveMode(){
+  zIdleShow('zMode2','zIdleRow2');
+  const mode=document.querySelector('input[name=zMode2]:checked').value;
+  try{await invoke('lock_set_mode',{mode,idleMin:parseInt(document.getElementById('zIdle2').value)})}catch(e){zMsg(String(e),true)}
+}
+function zChangePw(){
+  pwDialog({title:'비밀번호 바꾸기',fields:[{id:'_c1',ph:'새 비밀번호 (4자 이상)'},{id:'_c2',ph:'새 비밀번호 확인'}],okText:'바꾸기',
+    onOk:async v=>{
+      if(v._c1!==v._c2)return '새 비밀번호가 서로 달라요.';
+      try{await invoke('lock_change_password',{newPassword:v._c1});zMsg('비밀번호를 바꿨어요. 복구 코드는 그대로예요.')}catch(e){return String(e)}
+    }});
+}
+async function zDisable(){
+  if(!await customConfirm('잠금을 끌까요? 숨겼던 카테고리가 다시 일반 데이터로 돌아가요. (항목은 지워지지 않아요)','잠금 끄기'))return;
+  try{await invoke('lock_disable')}catch(e){zMsg(String(e),true)}
+}
+listen('lock-changed',()=>{
+  lkRender();
+  if(document.getElementById('sp').classList.contains('show')){zRender();renderExport();syRender();}
+});
+
 // ── 이벤트 ──
 listen('data-changed',e=>{
   fSel(e.payload.categories);fCl(e.payload.categories);
+  if(document.getElementById('sp').classList.contains('show'))catList('xEl',e.payload.categories,catCounts(e.payload.memos));
 });
 
 async function init(){
@@ -326,6 +825,7 @@ async function init(){
   _calColor=s.calendar_color||'';
   renderCalColors();
   await refresh();
+  await lkRender();
 }
 init();
 </script></body></html>
